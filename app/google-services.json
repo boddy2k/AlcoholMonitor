@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "983778595169",
+    "project_id": "alcoholmonitor-439cd",
+    "storage_bucket": "alcoholmonitor-439cd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:983778595169:android:289bff4dd4ef12f3397520",
+        "android_client_info": {
+          "package_name": "com.example.alcoholmonitor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJpwTfHdJq1ufzTRF3nTmPcWQYTOuUtPs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
