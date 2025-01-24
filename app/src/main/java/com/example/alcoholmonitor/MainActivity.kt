@@ -1,50 +1,231 @@
 package com.example.alcoholmonitor
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.example.alcoholmonitor.ui.theme.AlcoholMonitorTheme
 import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 
+private lateinit var auth: FirebaseAuth
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Initialize Firebase
         FirebaseApp.initializeApp(this)
+        testFirestore()
+        auth = FirebaseAuth.getInstance()
+
         setContent {
             AlcoholMonitorTheme {
-                // A surface container using the 'background' color from the theme
+                val navController = rememberNavController()
+
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    Greeting("Android")
+                    Scaffold(
+                        bottomBar = { BottomNavigationBar(navController) }
+                    ) { innerPadding ->
+                        NavigationHost(
+                            navController = navController,
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
+fun testFirestore() {
+    val db = Firebase.firestore
+
+    // Test writing data
+    val testData = hashMapOf("testField" to "Hello Firestore!")
+    db.collection("testCollection")
+        .add(testData)
+        .addOnSuccessListener { documentReference ->
+            Log.d("FirestoreTest", "DocumentSnapshot added with ID: ${documentReference.id}")
+        }
+        .addOnFailureListener { e ->
+            Log.w("FirestoreTest", "Error adding document", e)
+        }
 }
 
-@Preview(showBackground = true)
+fun signUp(context: ComponentActivity, email: String, password: String) {
+    auth.createUserWithEmailAndPassword(email, password)
+        .addOnCompleteListener(context) { task ->
+            if (task.isSuccessful) {
+                Log.d("Auth", "Signup successful!")
+            } else {
+                Log.w("Auth", "Signup failed", task.exception)
+            }
+        }
+}
+
+fun login(context: ComponentActivity, email: String, password: String) {
+    auth.signInWithEmailAndPassword(email, password)
+        .addOnCompleteListener(context) { task ->
+            if (task.isSuccessful) {
+                Log.d("Auth", "Login successful!")
+            } else {
+                Log.w("Auth", "Login failed", task.exception)
+            }
+        }
+}
+
 @Composable
-fun GreetingPreview() {
-    AlcoholMonitorTheme {
-        Greeting("Android")
+fun NavigationHost(navController: NavHostController, modifier: Modifier = Modifier) {
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Account.route,
+        modifier = modifier
+    ) {
+        composable(Screen.Account.route) { AccountScreen(auth = auth) }
+        composable(Screen.AddAlcohol.route) { AddAlcoholScreen() }
+        composable(Screen.List.route) { ListScreen() }
+    }
+}
+
+@Composable
+fun AccountScreen(auth: FirebaseAuth) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        TextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        TextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = {
+            auth.createUserWithEmailAndPassword(email, password)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Log.d("Auth", "Signup successful!")
+                    } else {
+                        Log.w("Auth", "Signup failed", task.exception)
+                    }
+                }
+        }) {
+            Text("Sign Up")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(onClick = {
+            auth.signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Log.d("Auth", "Login successful!")
+                    } else {
+                        Log.w("Auth", "Login failed", task.exception)
+                    }
+                }
+        }) {
+            Text("Log In")
+        }
+    }
+}
+
+@Composable
+fun AddAlcoholScreen() {
+    Text(text = "Add Alcohol Page", style = MaterialTheme.typography.headlineMedium)
+}
+
+@Composable
+fun ListScreen() {
+    Text(text = "List Page", style = MaterialTheme.typography.headlineMedium)
+}
+
+@Composable
+fun BottomNavigationBar(navController: NavController) {
+    val items = listOf(
+        Screen.Account to Icons.Filled.Person,
+        Screen.AddAlcohol to Icons.Filled.Add,
+        Screen.List to Icons.Filled.List
+    )
+
+    NavigationBar {
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentRoute = navBackStackEntry?.destination?.route
+
+        items.forEach { (screen, icon) ->
+            NavigationBarItem(
+                selected = currentRoute == screen.route,
+                onClick = {
+                    if (currentRoute != screen.route) {
+                        navController.navigate(screen.route) {
+                            // Avoid building up the back stack for each navigation
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                icon = { Icon(imageVector = icon, contentDescription = screen.route) },
+                label = { Text(text = screen.route.replace("_", " ").capitalize()) }
+            )
+        }
     }
 }

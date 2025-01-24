@@ -76,4 +76,6 @@ dependencies {
     implementation("com.google.firebase:firebase-auth-ktx")           // Firebase Authentication
     implementation("com.google.firebase:firebase-firestore:25.1.1")      // Firestore Database
     implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.navigation:navigation-compose:2.8.5")
+    implementation("com.google.firebase:firebase-auth-ktx")
 }
