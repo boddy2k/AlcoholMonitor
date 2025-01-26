@@ -2,6 +2,7 @@ package com.example.alcoholmonitor
 
 import android.os.Bundle
 import android.util.Log
+import android.util.Patterns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -117,17 +118,18 @@ fun login(context: ComponentActivity, email: String, password: String) {
 fun NavigationHost(navController: NavHostController, modifier: Modifier = Modifier) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Account.route,
+        startDestination = Screen.SignIn.route,
         modifier = modifier
     ) {
-        composable(Screen.Account.route) { AccountScreen(auth = auth) }
+        composable(Screen.SignIn.route) { SignInScreen(navController = navController, auth = auth) }
+        composable(Screen.Account.route) { AccountScreen(navController = navController, auth = auth) }
         composable(Screen.AddAlcohol.route) { AddAlcoholScreen() }
         composable(Screen.List.route) { ListScreen() }
     }
 }
 
 @Composable
-fun AccountScreen(auth: FirebaseAuth) {
+fun SignInScreen(navController: NavController, auth: FirebaseAuth) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
@@ -156,11 +158,13 @@ fun AccountScreen(auth: FirebaseAuth) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Sign Up Button
         Button(onClick = {
             auth.createUserWithEmailAndPassword(email, password)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         Log.d("Auth", "Signup successful!")
+                        navController.navigate(Screen.AddAlcohol.route) // Navigate after successful sign-up
                     } else {
                         Log.w("Auth", "Signup failed", task.exception)
                     }
@@ -171,17 +175,58 @@ fun AccountScreen(auth: FirebaseAuth) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        // Log In Button
         Button(onClick = {
-            auth.signInWithEmailAndPassword(email, password)
-                .addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        Log.d("Auth", "Login successful!")
-                    } else {
-                        Log.w("Auth", "Login failed", task.exception)
-                    }
+            if (email.isNotEmpty() && password.isNotEmpty()) {
+                if (Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    auth.signInWithEmailAndPassword(email, password)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Log.d("Auth", "Login successful!")
+                                navController.navigate(Screen.AddAlcohol.route) // Navigate after successful login
+                            } else {
+                                Log.w("Auth", "Login failed", task.exception)
+                            }
+                        }
+                } else {
+                    Log.w("Auth", "Invalid email format")
                 }
+            } else {
+                Log.w("Auth", "Email or password cannot be empty")
+            }
         }) {
             Text("Log In")
+        }
+    }
+}
+
+@Composable
+fun AccountScreen(navController: NavController, auth: FirebaseAuth) {
+    val user = auth.currentUser
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = "Account Details", style = MaterialTheme.typography.headlineMedium)
+
+        user?.email?.let {
+            Text(text = "Email: $it", style = MaterialTheme.typography.bodyLarge)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = {
+            auth.signOut()
+            navController.navigate(Screen.SignIn.route) {
+                // Clear backstack to prevent returning to the previous screen
+                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+            }
+        }) {
+            Text("Log Out")
         }
     }
 }
@@ -214,10 +259,7 @@ fun BottomNavigationBar(navController: NavController) {
                 onClick = {
                     if (currentRoute != screen.route) {
                         navController.navigate(screen.route) {
-                            // Avoid building up the back stack for each navigation
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
-                            }
+                            popUpTo(navController.graph.startDestinationId) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
                         }
