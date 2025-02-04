@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.List
@@ -233,7 +234,67 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth) {
 
 @Composable
 fun AddAlcoholScreen() {
-    Text(text = "Add Alcohol Page", style = MaterialTheme.typography.headlineMedium)
+    var searchText by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf(listOf<String>()) } // Stores matching results
+    val db = Firebase.firestore
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Search Bar
+        TextField(
+            value = searchText,
+            onValueChange = { newText ->
+                searchText = newText
+                searchAlcoholBrands(newText) { results ->
+                    searchResults = results
+                }
+            },
+            label = { Text("Search Alcohol Brand") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Display search results
+        LazyColumn {
+            items(searchResults.size) { index ->
+                Text(
+                    text = searchResults[index], // Correctly reference each item in the list
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
+    }
+}
+
+// Function to query Firestore for matching brands
+fun searchAlcoholBrands(query: String, onResult: (List<String>) -> Unit) {
+    if (query.isEmpty()) {
+        onResult(emptyList())
+        return
+    }
+
+    val db = Firebase.firestore
+    db.collection("lager_data")
+        .whereGreaterThanOrEqualTo("brands", query)
+        .whereLessThanOrEqualTo("brands", query + "\uf8ff") // Firestore text search trick
+        .get()
+        .addOnSuccessListener { documents ->
+            val brands = documents.mapNotNull { it.getString("brands") }
+            onResult(brands)
+        }
+        .addOnFailureListener {
+            Log.e("Firestore", "Error fetching data", it)
+            onResult(emptyList())
+        }
 }
 
 @Composable
