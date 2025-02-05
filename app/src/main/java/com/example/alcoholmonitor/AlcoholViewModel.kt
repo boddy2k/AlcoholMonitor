@@ -27,17 +27,22 @@ class AlcoholViewModel : ViewModel() {
     private val _totalAlcohol = MutableStateFlow(0.0)
     val totalAlcohol: StateFlow<Double> = _totalAlcohol
 
-    fun addAlcohol(alcohol: AlcoholItem) {
-        val updatedList = _alcoholList.value.toMutableMap()
-        updatedList[alcohol.brand] = (updatedList[alcohol.brand] ?: 0) + 1
-        _alcoholList.value = updatedList.toMap()
+    // Function to safely convert any invalid number to 0.0
+    private fun safeNumber(value: Double?): Double {
+        return value?.takeIf { it.isFinite() } ?: 0.0
+    }
 
-        // Persist macro totals
-        _totalCalories.value += alcohol.calories
-        _totalFat.value += alcohol.fat
-        _totalCarbs.value += alcohol.carbohydrates
-        _totalProtein.value += alcohol.protein
-        _totalSalt.value += alcohol.salt
-        _totalAlcohol.value += alcohol.alcoholContent
+    fun addAlcohol(alcohol: AlcoholItem) {
+        _alcoholList.value = _alcoholList.value.toMutableMap().apply {
+            this[alcohol.brand] = (this[alcohol.brand] ?: 0) + 1
+        }
+
+        // Ensure that only valid numeric values are added
+        _totalCalories.value += safeNumber(alcohol.calories)
+        _totalFat.value += safeNumber(alcohol.fat)
+        _totalCarbs.value += safeNumber(alcohol.carbohydrates)
+        _totalProtein.value += safeNumber(alcohol.protein)
+        _totalSalt.value += safeNumber(alcohol.salt)
+        _totalAlcohol.value += safeNumber(alcohol.alcoholContent)
     }
 }

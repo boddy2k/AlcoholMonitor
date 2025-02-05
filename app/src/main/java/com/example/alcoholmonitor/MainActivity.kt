@@ -322,18 +322,18 @@ fun searchAlcoholBrands(query: String, onResult: (List<AlcoholItem>) -> Unit) {
     val db = Firebase.firestore
     db.collection("lager_data")
         .whereGreaterThanOrEqualTo("brands", query)
-        .whereLessThanOrEqualTo("brands", query + "\uf8ff") // Firestore text search trick
+        .whereLessThanOrEqualTo("brands", query + "\uf8ff")
         .get()
         .addOnSuccessListener { documents ->
             val brands = documents.mapNotNull { doc ->
                 AlcoholItem(
                     brand = doc.getString("brands") ?: "",
-                    calories = doc.getDouble("energy-kcal_value") ?: 0.0,
-                    fat = doc.getDouble("fat_value") ?: 0.0,
-                    carbohydrates = doc.getDouble("carbohydrates_value") ?: 0.0,
-                    protein = doc.getDouble("proteins_value") ?: 0.0,
-                    salt = doc.getDouble("salt_value") ?: 0.0,
-                    alcoholContent = doc.getDouble("alcohol_value") ?: 0.0
+                    calories = doc.getDouble("energy-kcal_value")?.takeIf { it.isFinite() } ?: 0.0,
+                    fat = doc.getDouble("fat_value")?.takeIf { it.isFinite() } ?: 0.0,
+                    carbohydrates = doc.getDouble("carbohydrates_value")?.takeIf { it.isFinite() } ?: 0.0,
+                    protein = doc.getDouble("proteins_value")?.takeIf { it.isFinite() } ?: 0.0,
+                    salt = doc.getDouble("salt_value")?.takeIf { it.isFinite() } ?: 0.0,
+                    alcoholContent = doc.getDouble("alcohol_value")?.takeIf { it.isFinite() } ?: 0.0
                 )
             }
             onResult(brands)
