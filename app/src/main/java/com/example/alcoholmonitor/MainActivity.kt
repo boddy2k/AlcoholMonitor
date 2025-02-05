@@ -7,12 +7,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.List
@@ -27,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +59,9 @@ class MainActivity : ComponentActivity() {
         testFirestore()
         auth = FirebaseAuth.getInstance()
 
+        // Initialize ViewModel
+        val alcoholViewModel = AlcoholViewModel()
+
         setContent {
             AlcoholMonitorTheme {
                 val navController = rememberNavController()
@@ -69,7 +75,8 @@ class MainActivity : ComponentActivity() {
                     ) { innerPadding ->
                         NavigationHost(
                             navController = navController,
-                            modifier = Modifier.padding(innerPadding)
+                            modifier = Modifier.padding(innerPadding),
+                            sharedViewModel = alcoholViewModel // Pass ViewModel to screens
                         )
                     }
                 }
@@ -116,7 +123,7 @@ fun login(context: ComponentActivity, email: String, password: String) {
 }
 
 @Composable
-fun NavigationHost(navController: NavHostController, modifier: Modifier = Modifier) {
+fun NavigationHost(navController: NavHostController, sharedViewModel: AlcoholViewModel, modifier: Modifier = Modifier) {
     NavHost(
         navController = navController,
         startDestination = Screen.SignIn.route,
@@ -124,8 +131,8 @@ fun NavigationHost(navController: NavHostController, modifier: Modifier = Modifi
     ) {
         composable(Screen.SignIn.route) { SignInScreen(navController = navController, auth = auth) }
         composable(Screen.Account.route) { AccountScreen(navController = navController, auth = auth) }
-        composable(Screen.AddAlcohol.route) { AddAlcoholScreen() }
-        composable(Screen.List.route) { ListScreen() }
+        composable(Screen.AddAlcohol.route) { AddAlcoholScreen(sharedViewModel) }
+        composable(Screen.List.route) { ListScreen(sharedViewModel) }
     }
 }
 
@@ -233,10 +240,18 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth) {
 }
 
 @Composable
-fun AddAlcoholScreen() {
+fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
     var searchText by remember { mutableStateOf("") }
-    var searchResults by remember { mutableStateOf(listOf<String>()) } // Stores matching results
+    var searchResults by remember { mutableStateOf(listOf<AlcoholItem>()) }
     val db = Firebase.firestore
+
+    // Observe ViewModel state for macro totals
+    val totalCalories by sharedViewModel.totalCalories.collectAsState()
+    val totalFat by sharedViewModel.totalFat.collectAsState()
+    val totalCarbs by sharedViewModel.totalCarbs.collectAsState()
+    val totalProtein by sharedViewModel.totalProtein.collectAsState()
+    val totalSalt by sharedViewModel.totalSalt.collectAsState()
+    val totalAlcohol by sharedViewModel.totalAlcohol.collectAsState()
 
     Column(
         modifier = Modifier
@@ -262,21 +277,43 @@ fun AddAlcoholScreen() {
 
         // Display search results
         LazyColumn {
-            items(searchResults.size) { index ->
-                Text(
-                    text = searchResults[index], // Correctly reference each item in the list
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    style = MaterialTheme.typography.bodyLarge
-                )
+            items(searchResults) { alcohol ->
+                Button(
+                    onClick = {
+                        sharedViewModel.addAlcohol(alcohol)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("${alcohol.brand} - ${alcohol.alcoholContent}% ABV")
+                }
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Display total macros
+        Text("Total Calories: $totalCalories kcal", style = MaterialTheme.typography.bodyLarge)
+        Text("Total Fat: $totalFat g", style = MaterialTheme.typography.bodyLarge)
+        Text("Total Carbohydrates: $totalCarbs g", style = MaterialTheme.typography.bodyLarge)
+        Text("Total Protein: $totalProtein g", style = MaterialTheme.typography.bodyLarge)
+        Text("Total Salt: $totalSalt g", style = MaterialTheme.typography.bodyLarge)
+        Text("Total Alcohol: $totalAlcohol units", style = MaterialTheme.typography.bodyLarge)
     }
 }
 
-// Function to query Firestore for matching brands
-fun searchAlcoholBrands(query: String, onResult: (List<String>) -> Unit) {
+// Model for Alcohol Items
+data class AlcoholItem(
+    val brand: String,
+    val calories: Double,
+    val fat: Double,
+    val carbohydrates: Double,
+    val protein: Double,
+    val salt: Double,
+    val alcoholContent: Double
+)
+
+// Function to query Firestore
+fun searchAlcoholBrands(query: String, onResult: (List<AlcoholItem>) -> Unit) {
     if (query.isEmpty()) {
         onResult(emptyList())
         return
@@ -288,7 +325,17 @@ fun searchAlcoholBrands(query: String, onResult: (List<String>) -> Unit) {
         .whereLessThanOrEqualTo("brands", query + "\uf8ff") // Firestore text search trick
         .get()
         .addOnSuccessListener { documents ->
-            val brands = documents.mapNotNull { it.getString("brands") }
+            val brands = documents.mapNotNull { doc ->
+                AlcoholItem(
+                    brand = doc.getString("brands") ?: "",
+                    calories = doc.getDouble("energy-kcal_value") ?: 0.0,
+                    fat = doc.getDouble("fat_value") ?: 0.0,
+                    carbohydrates = doc.getDouble("carbohydrates_value") ?: 0.0,
+                    protein = doc.getDouble("proteins_value") ?: 0.0,
+                    salt = doc.getDouble("salt_value") ?: 0.0,
+                    alcoholContent = doc.getDouble("alcohol_value") ?: 0.0
+                )
+            }
             onResult(brands)
         }
         .addOnFailureListener {
@@ -298,8 +345,32 @@ fun searchAlcoholBrands(query: String, onResult: (List<String>) -> Unit) {
 }
 
 @Composable
-fun ListScreen() {
-    Text(text = "List Page", style = MaterialTheme.typography.headlineMedium)
+fun ListScreen(sharedViewModel: AlcoholViewModel) {
+    val alcoholList by sharedViewModel.alcoholList.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = "Alcohol List", style = MaterialTheme.typography.headlineMedium)
+
+        LazyColumn {
+            items(alcoholList.entries.toList()) { (brand, count) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = brand, style = MaterialTheme.typography.bodyLarge)
+                    Text(text = count.toString(), style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+        }
+    }
 }
 
 @Composable
