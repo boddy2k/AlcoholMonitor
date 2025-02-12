@@ -101,20 +101,20 @@ fun searchAlcoholBrands(query: String, onResult: (List<AlcoholItem>) -> Unit) {
         .get()
         .addOnSuccessListener { documents ->
             val filteredResults = documents.mapNotNull { doc ->
-                val name = doc.getString("drinkName") ?: ""
-                if (name.contains(query, ignoreCase = true)) {
+                val name = doc.getString("Drink Name") ?: ""
+                if (name.startsWith(query, ignoreCase = true)) {
                     AlcoholItem(
                         drinkName = name,
-                        brandName = doc.getString("brandName") ?: "",
-                        type = doc.getString("type") ?: "",
-                        abv = doc.getString("abv")?.replace("%", "")?.toDoubleOrNull() ?: 0.0,
-                        calories = doc.getDouble("calories") ?: 0.0,
-                        carbohydrates = doc.getDouble("carbohydrates")?.toString() ?: "0g",
-                        sugars = doc.getDouble("sugars")?.toString() ?: "0g",
-                        proteins = doc.getDouble("proteins")?.toString() ?: "0g",
-                        fats = doc.getDouble("fats")?.toString() ?: "0g",
-                        servingSize = doc.getString("servingSize") ?: "Unknown",
-                        alcoholUnits = doc.getDouble("alcoholUnits") ?: 0.0
+                        brandName = doc.getString("Brand Name") ?: "",
+                        type = doc.getString("Type") ?: "",
+                        abv = doc.getDouble("ABV") ?: 0.0,
+                        calories = doc.getDouble("Calories") ?: 0.0,
+                        carbohydrates = doc.getString("Carbohydrates") ?: "0g",
+                        sugars = doc.getString("Sugars") ?: "0g",
+                        proteins = doc.getString("Proteins")?.replace("g", "")?.toDoubleOrNull()?.toString() ?: "0g",
+                        fats = doc.getString("Fats")?.replace("g", "")?.toDoubleOrNull()?.toString() ?: "0g",
+                        servingSize = doc.getString("Serving Size") ?: "Unknown",
+                        alcoholUnits = doc.getDouble("UK Alcohol Units") ?: 0.0
                     )
                 } else null
             }
@@ -125,7 +125,6 @@ fun searchAlcoholBrands(query: String, onResult: (List<AlcoholItem>) -> Unit) {
             onResult(emptyList())
         }
 }
-
 // 🔹 Main Navigation
 @Composable
 fun NavigationHost(navController: NavHostController, sharedViewModel: AlcoholViewModel, modifier: Modifier = Modifier) {
@@ -217,31 +216,54 @@ fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
     var searchText by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf(listOf<AlcoholItem>()) }
 
+    // ✅ Observe the ViewModel state for nutrition totals
+    val totalCalories by sharedViewModel.totalCalories.collectAsState()
+    val totalCarbs by sharedViewModel.totalCarbs.collectAsState()
+    val totalProtein by sharedViewModel.totalProtein.collectAsState()
+    val totalFat by sharedViewModel.totalFat.collectAsState()
+    val totalAlcoholUnits by sharedViewModel.totalAlcohol.collectAsState()
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // 🔍 Search Bar
         TextField(
             value = searchText,
-            onValueChange = { newText -> searchText = newText; searchAlcoholBrands(newText) { searchResults = it } },
+            onValueChange = { newText ->
+                searchText = newText
+                searchAlcoholBrands(newText) { results ->
+                    searchResults = results
+                }
+            },
             label = { Text("Search Alcohol Brand") },
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 🔎 Display Search Results (Drinks Only)
         LazyColumn {
             items(searchResults) { alcohol ->
-                Button(onClick = { sharedViewModel.addAlcohol(alcohol) }, modifier = Modifier.fillMaxWidth()) {
-                    Column {
-                        Text("${alcohol.drinkName} (${alcohol.brandName}) - ${alcohol.abv}% ABV")
-                        Text("Calories: ${alcohol.calories} kcal | Carbs: ${alcohol.carbohydrates}")
-                        Text("Alcohol Units: ${alcohol.alcoholUnits}")
-                    }
+                Button(
+                    onClick = { sharedViewModel.addAlcohol(alcohol) }, // ✅ Add drink when clicked
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("${alcohol.drinkName} (${alcohol.brandName})")
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 🧮 Display Total Nutrition Data
+        Text(text = "Total Nutrition Added:", style = MaterialTheme.typography.headlineMedium)
+        Text(text = "Calories: $totalCalories kcal")
+        Text(text = "Carbohydrates: $totalCarbs g")
+        Text(text = "Proteins: $totalProtein g")
+        Text(text = "Fats: $totalFat g")
+        Text(text = "Alcohol Units: $totalAlcoholUnits")
     }
 }
 
