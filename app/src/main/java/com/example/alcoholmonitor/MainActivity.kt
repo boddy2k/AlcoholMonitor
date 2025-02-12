@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.List
@@ -34,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
@@ -81,13 +84,17 @@ data class AlcoholItem(
     val type: String,
     val abv: Double,
     val calories: Double,
-    val carbohydrates: String,
+    val carbohydrates: String,  // Storing as string
     val sugars: String,
     val proteins: String,
     val fats: String,
     val servingSize: String,
     val alcoholUnits: Double
-)
+) {
+    fun getCarbohydratesAsDouble(): Double {
+        return carbohydrates.replace("g", "").trim().toDoubleOrNull() ?: 0.0
+    }
+}
 
 // 🔹 Fetch and Search Alcohol Data
 fun searchAlcoholBrands(query: String, onResult: (List<AlcoholItem>) -> Unit) {
@@ -145,52 +152,95 @@ fun NavigationHost(navController: NavHostController, sharedViewModel: AlcoholVie
 fun SignInScreen(navController: NavController, auth: FirebaseAuth) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        TextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        TextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, modifier = Modifier.fillMaxWidth())
+        Text(
+            text = "Welcome Back!",
+            style = MaterialTheme.typography.headlineMedium
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Email Input
+        TextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
+
+        // Password Input
+        TextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            singleLine = true,
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
 
         // Log In Button
-        Button(onClick = {
-            if (email.isNotEmpty() && password.isNotEmpty()) {
-                auth.signInWithEmailAndPassword(email, password)
-                    .addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            Log.d("Auth", "Login successful!")
-                            navController.navigate(Screen.AddAlcohol.route) // Navigate to Add Alcohol screen
-                        } else {
-                            Log.w("Auth", "Login failed", task.exception)
+        Button(
+            onClick = {
+                if (email.isNotEmpty() && password.isNotEmpty()) {
+                    auth.signInWithEmailAndPassword(email, password)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Log.d("Auth", "Login successful!")
+                                navController.navigate(Screen.AddAlcohol.route)
+                            } else {
+                                Log.w("Auth", "Login failed", task.exception)
+                            }
                         }
-                    }
-            } else {
-                Log.w("Auth", "Email or password cannot be empty")
-            }
-        }) { Text("Log In") }
-
-        Spacer(modifier = Modifier.height(8.dp))
+                } else {
+                    Log.w("Auth", "Email or password cannot be empty")
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Log In", style = MaterialTheme.typography.labelLarge)
+        }
 
         // Sign Up Button
-        Button(onClick = {
-            if (email.isNotEmpty() && password.isNotEmpty()) {
-                auth.createUserWithEmailAndPassword(email, password)
-                    .addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            Log.d("Auth", "Signup successful!")
-                            navController.navigate(Screen.AddAlcohol.route) // Navigate to Add Alcohol screen
-                        } else {
-                            Log.w("Auth", "Signup failed", task.exception)
+        Button(
+            onClick = {
+                if (email.isNotEmpty() && password.isNotEmpty()) {
+                    auth.createUserWithEmailAndPassword(email, password)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Log.d("Auth", "Signup successful!")
+                                navController.navigate(Screen.AddAlcohol.route)
+                            } else {
+                                Log.w("Auth", "Signup failed", task.exception)
+                            }
                         }
-                    }
-            } else {
-                Log.w("Auth", "Email or password cannot be empty")
-            }
-        }) { Text("Sign Up") }
+                } else {
+                    Log.w("Auth", "Email or password cannot be empty")
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Sign Up", style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 
@@ -278,11 +328,34 @@ fun ListScreen(sharedViewModel: AlcoholViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(text = "Alcohol List", style = MaterialTheme.typography.headlineMedium)
+
         LazyColumn {
             items(alcoholList.entries.toList()) { (brand, count) ->
-                Row(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Text(text = brand, style = MaterialTheme.typography.bodyLarge)
                     Text(text = count.toString(), style = MaterialTheme.typography.bodyLarge)
+                    Button(onClick = {
+                        sharedViewModel.removeAlcohol(
+                            AlcoholItem(
+                                drinkName = brand,
+                                brandName = brand,
+                                type = "",
+                                abv = 0.0,
+                                calories = 0.0,
+                                carbohydrates = "0g",
+                                sugars = "0g",
+                                proteins = "0g",
+                                fats = "0g",
+                                servingSize = "",
+                                alcoholUnits = 0.0
+                            )
+                        )
+                    }) {
+                        Text("Remove")
+                    }
                 }
             }
         }
