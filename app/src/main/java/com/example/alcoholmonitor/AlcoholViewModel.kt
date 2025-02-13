@@ -71,19 +71,24 @@ class AlcoholViewModel : ViewModel() {
             }
         }
 
-        // Subtract the macros from totals
+        // Correctly extract numeric values
+        val fatValue = alcohol.fats.replace("g", "").toDoubleOrNull() ?: 0.0
+        val carbValue = alcohol.carbohydrates.replace("g", "").toDoubleOrNull() ?: 0.0
+        val proteinValue = alcohol.proteins.replace("g", "").toDoubleOrNull() ?: 0.0
+
+        // Subtract from totals
         _totalCalories.value -= alcohol.calories
-        _totalFat.value -= alcohol.fats.toDoubleOrNull() ?: 0.0
-        _totalCarbs.value -= alcohol.carbohydrates.toDoubleOrNull() ?: 0.0
-        _totalProtein.value -= alcohol.proteins.toDoubleOrNull() ?: 0.0
+        _totalFat.value -= fatValue
+        _totalCarbs.value -= carbValue
+        _totalProtein.value -= proteinValue
         _totalAlcohol.value -= alcohol.alcoholUnits
 
         // Prevent negative values
-        if (_totalCalories.value < 0) _totalCalories.value = 0.0
-        if (_totalFat.value < 0) _totalFat.value = 0.0
-        if (_totalCarbs.value < 0) _totalCarbs.value = 0.0
-        if (_totalProtein.value < 0) _totalProtein.value = 0.0
-        if (_totalAlcohol.value < 0) _totalAlcohol.value = 0.0
+        _totalCalories.value = _totalCalories.value.coerceAtLeast(0.0)
+        _totalFat.value = _totalFat.value.coerceAtLeast(0.0)
+        _totalCarbs.value = _totalCarbs.value.coerceAtLeast(0.0)
+        _totalProtein.value = _totalProtein.value.coerceAtLeast(0.0)
+        _totalAlcohol.value = _totalAlcohol.value.coerceAtLeast(0.0)
     }
 
     fun getAlcoholItem(drinkName: String): AlcoholItem {
