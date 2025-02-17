@@ -123,7 +123,7 @@ fun NavigationHost(navController: NavHostController, sharedViewModel: AlcoholVie
         modifier = modifier
     ) {
         composable(Screen.SignIn.route) { SignInScreen(navController = navController, auth = auth) }
-        composable(Screen.Account.route) { AccountScreen(navController = navController, auth = auth) }
+        composable(Screen.Account.route) { AccountScreen(navController = navController, auth = auth, sharedViewModel = sharedViewModel) }
         composable(Screen.AddAlcohol.route) { AddAlcoholScreen(sharedViewModel) }
         composable(Screen.List.route) { ListScreen(sharedViewModel) }
     }
@@ -228,19 +228,68 @@ fun SignInScreen(navController: NavController, auth: FirebaseAuth) {
 
 // 🔹 Account Screen
 @Composable
-fun AccountScreen(navController: NavController, auth: FirebaseAuth) {
+fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewModel: AlcoholViewModel) {
     val user = auth.currentUser
+    var weeklyIntake by remember { mutableStateOf<Map<String, Map<String, Any>>>(emptyMap()) }
+
+    // 🔹 Fetch weekly intake when the screen loads
+    LaunchedEffect(user) {
+        user?.uid?.let { userId ->
+            sharedViewModel.fetchAlcoholIntake(
+                userId = userId,
+                onComplete = { data -> weeklyIntake = data },
+                onError = { error -> Log.e("Firestore", "Error fetching alcohol intake", error) }
+            )
+        }
+    }
+
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(text = "Account Details", style = MaterialTheme.typography.headlineMedium)
-        user?.email?.let { Text(text = "Email: $it", style = MaterialTheme.typography.bodyLarge) }
+
+        user?.email?.let {
+            Text(text = "Email: $it", style = MaterialTheme.typography.bodyLarge)
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { auth.signOut(); navController.navigate(Screen.SignIn.route) }) { Text("Log Out") }
+
+        // 🔹 Weekly Alcohol Intake Section
+        Text(text = "Weekly Alcohol Intake", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (weeklyIntake.isEmpty()) {
+            Text(text = "No alcohol logged this week", style = MaterialTheme.typography.bodyLarge)
+        } else {
+            weeklyIntake.forEach { (drinkName, drinkData) ->
+                val count = (drinkData["count"] as? Long) ?: 0L
+                val units = (drinkData["units"] as? Double) ?: 0.0
+
+                Text(
+                    text = "$drinkName: $count drinks (${units} units)",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 🔹 Logout Button
+        Button(
+            onClick = {
+                auth.signOut()
+                navController.navigate(Screen.SignIn.route)
+            }
+        ) {
+            Text("Log Out")
+        }
     }
 }
+
 
 // 🔹 Add Alcohol Screen
 @Composable

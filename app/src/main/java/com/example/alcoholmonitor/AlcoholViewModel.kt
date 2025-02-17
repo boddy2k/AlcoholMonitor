@@ -55,7 +55,8 @@ class AlcoholViewModel : ViewModel() {
             val dayOfWeek = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date())
 
             // ✅ Call `logAlcoholIntake()` with +1 count
-            logAlcoholIntake(userId, alcohol.drinkName, 1, alcohol.alcoholUnits)
+            logAlcoholIntake(user.uid, alcohol, 1)
+
         } else {
             Log.w("ViewModel", "No user is logged in. Cannot log alcohol intake.")
         }
@@ -72,29 +73,26 @@ class AlcoholViewModel : ViewModel() {
                 if (newCount > 0) {
                     this[alcohol] = newCount
                 } else {
-                    this.remove(alcohol) // ✅ Remove from list if it hits 0
+                    this.remove(alcohol)
                 }
             }
 
-            // ✅ Update nutritional values
+            // Subtract values from totals
             _totalCalories.value = (_totalCalories.value - alcohol.calories).coerceAtLeast(0.0)
             _totalFat.value = (_totalFat.value - alcohol.getFatsAsDouble()).coerceAtLeast(0.0)
             _totalCarbs.value = (_totalCarbs.value - alcohol.getCarbohydratesAsDouble()).coerceAtLeast(0.0)
             _totalProtein.value = (_totalProtein.value - alcohol.getProteinsAsDouble()).coerceAtLeast(0.0)
             _totalAlcohol.value = (_totalAlcohol.value - alcohol.alcoholUnits).coerceAtLeast(0.0)
 
-            Log.d("RemoveAlcohol", "After Removal - Calories: ${_totalCalories.value}, Carbs: ${_totalCarbs.value}, Alcohol Units: ${_totalAlcohol.value}")
-
-            val user = FirebaseAuth.getInstance().currentUser
+            // 🔹 Log removal in Firestore
+            val auth = FirebaseAuth.getInstance()
+            val user = auth.currentUser
             if (user != null) {
-                val userId = user.uid
-                val dayOfWeek = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date())
-
-                // ✅ Call `logAlcoholIntake()` with -1 count
-                logAlcoholIntake(userId, alcohol.drinkName, -1, -alcohol.alcoholUnits)
-            } else {
-                Log.w("ViewModel", "No user is logged in. Cannot log alcohol removal.")
+                logAlcoholIntake(user.uid, alcohol, -1)
+                // 🔥 Remove from Firestore
             }
+
+            Log.d("RemoveAlcohol", "After Removal - Calories: ${_totalCalories.value}, Carbs: ${_totalCarbs.value}, Alcohol Units: ${_totalAlcohol.value}")
         } else {
             Log.w("RemoveAlcohol", "Attempted to remove a drink that doesn't exist in the list")
         }
@@ -102,9 +100,54 @@ class AlcoholViewModel : ViewModel() {
 
 
 
-    private fun logAlcoholIntake(userId: String, drinkName: String, count: Int, alcoholUnits: Double) {
-        Log.d("Firestore", "🔥 Firestore Update Triggered - $drinkName -> Count=$count, Units=$alcoholUnits")
+    fun logAlcoholIntake(userId: String, alcohol: AlcoholItem, count: Int) {
+        val db = Firebase.firestore
+        val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(Calendar.getInstance().time)
 
+        val docRef = db.collection("users").document(userId)
+            .collection("alcohol_intake").document(weekId)
+
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(docRef)
+            val currentData = snapshot.data?.toMutableMap() ?: mutableMapOf()
+
+            // Retrieve existing drink data, default to count 0, units 0.0
+            val drinkData = currentData[alcohol.drinkName] as? Map<*, *> ?: mapOf("count" to 0L, "units" to 0.0)
+            val currentCount = (drinkData["count"] as? Long) ?: 0L
+            val currentUnits = (drinkData["units"] as? Double) ?: 0.0
+
+            // Update values, ensuring count and units never go negative
+            val newCount = (currentCount + count).coerceAtLeast(0)
+            val newUnits = (currentUnits + (count * alcohol.alcoholUnits)).coerceAtLeast(0.0)
+
+            if (newCount > 0) {
+                // Update or add the drink entry
+                currentData[alcohol.drinkName] = mapOf("count" to newCount, "units" to newUnits)
+            } else {
+                // Remove the drink if count is zero
+                currentData.remove(alcohol.drinkName)
+            }
+
+            if (currentData.isEmpty()) {
+                // Remove the week's entry if no drinks remain
+                transaction.delete(docRef)
+            } else {
+                transaction.set(docRef, currentData, SetOptions.merge())
+            }
+        }.addOnSuccessListener {
+            Log.d("Firestore", "Alcohol intake successfully updated: ${alcohol.drinkName} -> Drinks=$count, Units=${count * alcohol.alcoholUnits}")
+        }.addOnFailureListener { e ->
+            Log.e("Firestore", "Error updating alcohol intake", e)
+        }
+    }
+
+
+
+    fun fetchAlcoholIntake(
+        userId: String,
+        onComplete: (Map<String, Map<String, Any>>) -> Unit,
+        onError: (Exception) -> Unit
+    ) {
         val db = Firebase.firestore
         val calendar = Calendar.getInstance()
         val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(calendar.time)
@@ -112,37 +155,21 @@ class AlcoholViewModel : ViewModel() {
         val docRef = db.collection("users").document(userId)
             .collection("alcohol_intake").document(weekId)
 
-        db.runTransaction { transaction ->
-            val snapshot = transaction.get(docRef)
-            val currentData = snapshot.data ?: emptyMap()
-
-            val drinkData = currentData[drinkName] as? Map<*, *> ?: mapOf("count" to 0L, "units" to 0.0)
-            val currentCount = (drinkData["count"] as? Long) ?: 0L
-            val currentUnits = (drinkData["units"] as? Double) ?: 0.0
-
-            val newCount = (currentCount + count).coerceAtLeast(0)
-            val newUnits = (currentUnits + alcoholUnits).coerceAtLeast(0.0)
-
-            val updatedData = currentData.toMutableMap().apply {
-                if (newCount > 0) {
-                    this[drinkName] = mapOf("count" to newCount, "units" to newUnits)
+        docRef.get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val data = document.data?.mapValues { entry ->
+                        entry.value as? Map<String, Any> ?: emptyMap()
+                    } ?: emptyMap()
+                    onComplete(data)
                 } else {
-                    this.remove(drinkName) // ✅ DELETE the entry if count reaches zero
+                    onComplete(emptyMap()) // No data found for this week
                 }
             }
-
-            if (updatedData.isEmpty()) {
-                // ✅ If no drinks are left, delete the whole week document
-                transaction.delete(docRef)
-                Log.d("Firestore", "🔥 Deleted week document as no drinks remain")
-            } else {
-                transaction.set(docRef, updatedData, SetOptions.merge())
+            .addOnFailureListener { exception ->
+                Log.e("Firestore", "Error fetching alcohol intake", exception)
+                onError(exception)
             }
-        }.addOnSuccessListener {
-            Log.d("Firestore", "✅ Successfully updated Firestore: $drinkName -> Drinks=$count, Units=$alcoholUnits")
-        }.addOnFailureListener { e ->
-            Log.e("Firestore", "❌ Error updating alcohol intake", e)
-        }
     }
 
 }
