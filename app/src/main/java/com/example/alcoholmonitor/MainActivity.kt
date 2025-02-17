@@ -28,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,25 +75,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-}
-
-// 🔹 Firestore Model
-data class AlcoholItem(
-    val drinkName: String,
-    val brandName: String,
-    val type: String,
-    val abv: Double,
-    val calories: Double,
-    val carbohydrates: String,  // Storing as string
-    val sugars: String,
-    val proteins: String,
-    val fats: String,
-    val servingSize: String,
-    val alcoholUnits: Double
-) {
-    fun getCarbohydratesAsDouble(): Double {
-        return carbohydrates.replace("g", "").trim().toDoubleOrNull() ?: 0.0
     }
 }
 
@@ -266,12 +248,20 @@ fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
     var searchText by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf(listOf<AlcoholItem>()) }
 
-    // ✅ Observe the ViewModel state for nutrition totals
+    // ✅ Collect state values from ViewModel
     val totalCalories by sharedViewModel.totalCalories.collectAsState()
     val totalCarbs by sharedViewModel.totalCarbs.collectAsState()
-    val totalProtein by sharedViewModel.totalProtein.collectAsState()
-    val totalFat by sharedViewModel.totalFat.collectAsState()
     val totalAlcoholUnits by sharedViewModel.totalAlcohol.collectAsState()
+    val totalFat by sharedViewModel.totalFat.collectAsState()
+    val totalProtein by sharedViewModel.totalProtein.collectAsState()
+
+    // ✅ Force UI recomposition when totals change
+    LaunchedEffect(totalCalories, totalCarbs, totalAlcoholUnits, totalFat, totalProtein) {
+        Log.d(
+            "UI Update",
+            "New Totals - Calories: $totalCalories, Carbs: $totalCarbs, Fats: $totalFat, Protein: $totalProtein, Alcohol Units: $totalAlcoholUnits"
+        )
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -311,8 +301,8 @@ fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
         Text(text = "Total Nutrition Added:", style = MaterialTheme.typography.headlineMedium)
         Text(text = "Calories: $totalCalories kcal")
         Text(text = "Carbohydrates: $totalCarbs g")
-        Text(text = "Proteins: $totalProtein g")
         Text(text = "Fats: $totalFat g")
+        Text(text = "Proteins: $totalProtein g")
         Text(text = "Alcohol Units: $totalAlcoholUnits")
     }
 }
@@ -330,30 +320,14 @@ fun ListScreen(sharedViewModel: AlcoholViewModel) {
         Text(text = "Alcohol List", style = MaterialTheme.typography.headlineMedium)
 
         LazyColumn {
-            items(alcoholList.entries.toList()) { (brand, count) ->
+            items(alcoholList.entries.toList()) { (alcohol, count) ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(text = brand, style = MaterialTheme.typography.bodyLarge)
+                    Text(text = "${alcohol.drinkName} (${alcohol.brandName})", style = MaterialTheme.typography.bodyLarge)
                     Text(text = count.toString(), style = MaterialTheme.typography.bodyLarge)
-                    Button(onClick = {
-                        sharedViewModel.removeAlcohol(
-                            AlcoholItem(
-                                drinkName = brand,
-                                brandName = brand,
-                                type = "",
-                                abv = 0.0,
-                                calories = 0.0,
-                                carbohydrates = "0g",
-                                sugars = "0g",
-                                proteins = "0g",
-                                fats = "0g",
-                                servingSize = "",
-                                alcoholUnits = 0.0
-                            )
-                        )
-                    }) {
+                    Button(onClick = { sharedViewModel.removeAlcohol(alcohol) }) {
                         Text("Remove")
                     }
                 }

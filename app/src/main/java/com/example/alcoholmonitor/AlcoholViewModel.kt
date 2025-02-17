@@ -15,8 +15,8 @@ import java.util.Locale
 
 class AlcoholViewModel : ViewModel() {
 
-    private val _alcoholList = MutableStateFlow<Map<String, Int>>(emptyMap())
-    val alcoholList: StateFlow<Map<String, Int>> = _alcoholList
+    private val _alcoholList = MutableStateFlow<Map<AlcoholItem, Int>>(emptyMap())
+    val alcoholList: StateFlow<Map<AlcoholItem, Int>> = _alcoholList
 
     private val _totalCalories = MutableStateFlow(0.0)
     val totalCalories: StateFlow<Double> = _totalCalories
@@ -34,80 +34,72 @@ class AlcoholViewModel : ViewModel() {
     val totalAlcohol: StateFlow<Double> = _totalAlcohol
 
     fun addAlcohol(alcohol: AlcoholItem) {
+        Log.d("ViewModel", "addAlcohol() called for ${alcohol.drinkName}")
+
         _alcoholList.value = _alcoholList.value.toMutableMap().apply {
-            this[alcohol.brandName] = (this[alcohol.brandName] ?: 0) + 1
+            this[alcohol] = (this[alcohol] ?: 0) + 1
         }
 
-        _totalCalories.value += alcohol.calories
-        _totalFat.value += alcohol.fats.replace("g", "").toDoubleOrNull() ?: 0.0
-        _totalCarbs.value += alcohol.getCarbohydratesAsDouble()  // FIXED
-        _totalProtein.value += alcohol.proteins.replace("g", "").toDoubleOrNull() ?: 0.0
-        _totalAlcohol.value += alcohol.alcoholUnits
+        _totalCalories.value = (_totalCalories.value + alcohol.calories).coerceAtLeast(0.0)
+        _totalFat.value = (_totalFat.value + alcohol.getFatsAsDouble()).coerceAtLeast(0.0)
+        _totalCarbs.value =
+            (_totalCarbs.value + alcohol.getCarbohydratesAsDouble()).coerceAtLeast(0.0)
+        _totalProtein.value =
+            (_totalProtein.value + alcohol.getProteinsAsDouble()).coerceAtLeast(0.0)
+        _totalAlcohol.value = (_totalAlcohol.value + alcohol.alcoholUnits).coerceAtLeast(0.0)
 
-        // 🔹 Get User ID Safely
         val auth = FirebaseAuth.getInstance()
-        val user = auth.currentUser
-
-        if (user != null) {
+        auth.currentUser?.let { user ->
             val userId = user.uid
-
-            // 🔹 Get the current day of the week
             val dayOfWeek = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date())
 
-            // 🔹 Log the intake in Firestore
-            logAlcoholIntake(userId, dayOfWeek, 1, alcohol.alcoholUnits)
-        } else {
-            println("No user is logged in. Cannot log alcohol intake.")
-        }
+            // ✅ Call updated function
+            logAlcoholIntake(userId, alcohol, 1)
+        } ?: Log.w("ViewModel", "No user is logged in. Cannot log alcohol intake.")
     }
+
 
     fun removeAlcohol(alcohol: AlcoholItem) {
-        _alcoholList.value = _alcoholList.value.toMutableMap().apply {
-            val currentCount = this[alcohol.brandName] ?: 0
-            if (currentCount > 1) {
-                this[alcohol.brandName] = currentCount - 1
-            } else {
-                this.remove(alcohol.brandName)
+        val currentCount = _alcoholList.value[alcohol] ?: 0
+
+        if (currentCount > 0) {
+            _alcoholList.value = _alcoholList.value.toMutableMap().apply {
+                val newCount = currentCount - 1
+                if (newCount > 0) {
+                    this[alcohol] = newCount
+                } else {
+                    this.remove(alcohol)
+                }
             }
+
+            _totalCalories.value = (_totalCalories.value - alcohol.calories).coerceAtLeast(0.0)
+            _totalFat.value = (_totalFat.value - alcohol.getFatsAsDouble()).coerceAtLeast(0.0)
+            _totalCarbs.value =
+                (_totalCarbs.value - alcohol.getCarbohydratesAsDouble()).coerceAtLeast(0.0)
+            _totalProtein.value =
+                (_totalProtein.value - alcohol.getProteinsAsDouble()).coerceAtLeast(0.0)
+            _totalAlcohol.value = (_totalAlcohol.value - alcohol.alcoholUnits).coerceAtLeast(0.0)
+
+            val auth = FirebaseAuth.getInstance()
+            auth.currentUser?.let { user ->
+                val userId = user.uid
+                val dayOfWeek = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date())
+
+                // ✅ Remove from Firestore
+                logAlcoholIntake(userId, alcohol, -1)
+            } ?: Log.w("ViewModel", "No user is logged in. Cannot update alcohol intake.")
+        } else {
+            Log.w("RemoveAlcohol", "Attempted to remove a drink that doesn't exist in the list")
         }
-
-        // Correctly extract numeric values
-        val fatValue = alcohol.fats.replace("g", "").toDoubleOrNull() ?: 0.0
-        val carbValue = alcohol.carbohydrates.replace("g", "").toDoubleOrNull() ?: 0.0
-        val proteinValue = alcohol.proteins.replace("g", "").toDoubleOrNull() ?: 0.0
-
-        // Subtract from totals
-        _totalCalories.value -= alcohol.calories
-        _totalFat.value -= fatValue
-        _totalCarbs.value -= carbValue
-        _totalProtein.value -= proteinValue
-        _totalAlcohol.value -= alcohol.alcoholUnits
-
-        // Prevent negative values
-        _totalCalories.value = _totalCalories.value.coerceAtLeast(0.0)
-        _totalFat.value = _totalFat.value.coerceAtLeast(0.0)
-        _totalCarbs.value = _totalCarbs.value.coerceAtLeast(0.0)
-        _totalProtein.value = _totalProtein.value.coerceAtLeast(0.0)
-        _totalAlcohol.value = _totalAlcohol.value.coerceAtLeast(0.0)
     }
 
-    fun getAlcoholItem(drinkName: String): AlcoholItem {
-        return AlcoholItem(
-            drinkName = drinkName,
-            brandName = "", // We don’t need brand here
-            type = "",
-            abv = 0.0,
-            calories = 0.0,
-            carbohydrates = "0",
-            sugars = "0",
-            proteins = "0",
-            fats = "0",
-            servingSize = "",
-            alcoholUnits = 0.0
+
+    fun logAlcoholIntake(userId: String, alcohol: AlcoholItem, count: Int) {
+        Log.d(
+            "Firestore",
+            "🔥 Firestore Update Triggered - ${alcohol.drinkName} -> Count=$count, Units=${alcohol.alcoholUnits}"
         )
-    }
 
-    fun logAlcoholIntake(userId: String, dayOfWeek: String, count: Int, alcoholUnits: Double) {
         val db = Firebase.firestore
         val calendar = Calendar.getInstance()
         val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(calendar.time)
@@ -117,26 +109,35 @@ class AlcoholViewModel : ViewModel() {
 
         db.runTransaction { transaction ->
             val snapshot = transaction.get(docRef)
-            val currentData = snapshot.data
+            val currentData = snapshot.data ?: emptyMap()
 
-            val currentCount = (currentData?.get(dayOfWeek) as? Map<*, *>)?.get("count") as? Long ?: 0
-            val currentUnits = (currentData?.get(dayOfWeek) as? Map<*, *>)?.get("units") as? Double ?: 0.0
+            // 🔹 Retrieve existing drink data or default to zero
+            val drinksMap = currentData.toMutableMap()
+            val drinkKey = "${alcohol.brandName} - ${alcohol.drinkName}" // Unique key
 
-            val newCount = currentCount + count
-            val newUnits = currentUnits + alcoholUnits
+            val drinkData =
+                drinksMap[drinkKey] as? Map<*, *> ?: mapOf("count" to 0L, "units" to 0.0)
+            val currentCount = (drinkData["count"] as? Long) ?: 0L
+            val currentUnits = (drinkData["units"] as? Double) ?: 0.0
 
-            val updatedData = mapOf(
-                dayOfWeek to mapOf(
-                    "count" to newCount,
-                    "units" to newUnits
-                )
-            )
+            // 🔹 Update Firestore only if count remains valid
+            val newCount = (currentCount + count).coerceAtLeast(0)
+            val newUnits = (currentUnits + alcohol.alcoholUnits * count).coerceAtLeast(0.0)
 
-            transaction.set(docRef, updatedData, SetOptions.merge())
+            if (newCount > 0) {
+                drinksMap[drinkKey] = mapOf("count" to newCount, "units" to newUnits)
+            } else {
+                drinksMap.remove(drinkKey) // Remove if zero
+            }
+
+            transaction.set(docRef, drinksMap, SetOptions.merge())
         }.addOnSuccessListener {
-            Log.d("Firestore", "Alcohol intake successfully updated.")
+            Log.d(
+                "Firestore",
+                "✅ Alcohol intake updated: ${alcohol.drinkName} -> Drinks=$count, Units=${alcohol.alcoholUnits}"
+            )
         }.addOnFailureListener { e ->
-            Log.e("Firestore", "Error updating alcohol intake", e)
+            Log.e("Firestore", "❌ Error updating alcohol intake", e)
         }
     }
 }
