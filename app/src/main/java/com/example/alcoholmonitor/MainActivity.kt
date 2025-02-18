@@ -4,7 +4,10 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,6 +39,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -243,52 +249,66 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally
+    // 🔹 Background Image
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
-        Text(text = "Account Details", style = MaterialTheme.typography.headlineMedium)
+        Image(
+            painter = painterResource(id = R.drawable.account_background), // Replace with actual drawable name
+            contentDescription = "Account Background",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
 
-        user?.email?.let {
-            Text(text = "Email: $it", style = MaterialTheme.typography.bodyLarge)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 🔹 Weekly Alcohol Intake Section
-        Text(text = "Weekly Alcohol Intake", style = MaterialTheme.typography.titleMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (weeklyIntake.isEmpty()) {
-            Text(text = "No alcohol logged this week", style = MaterialTheme.typography.bodyLarge)
-        } else {
-            weeklyIntake.forEach { (drinkName, drinkData) ->
-                val count = (drinkData["count"] as? Long) ?: 0L
-                val units = (drinkData["units"] as? Double) ?: 0.0
-
-                Text(
-                    text = "$drinkName: $count drinks (${units} units)",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 🔹 Logout Button
-        Button(
-            onClick = {
-                auth.signOut()
-                navController.navigate(Screen.SignIn.route)
-            }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Top,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Log Out")
+            Text(text = "Account Details", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+
+            user?.email?.let {
+                Text(text = "Email: $it", style = MaterialTheme.typography.bodyLarge, color = Color.White)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 🔹 Weekly Alcohol Intake Section
+            Text(text = "Weekly Alcohol Intake", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (weeklyIntake.isEmpty()) {
+                Text(text = "No alcohol logged this week", style = MaterialTheme.typography.bodyLarge, color = Color.White)
+            } else {
+                weeklyIntake.forEach { (drinkName, drinkData) ->
+                    val count = (drinkData["count"] as? Long) ?: 0L
+                    val units = (drinkData["units"] as? Double) ?: 0.0
+
+                    Text(
+                        text = "$drinkName: $count drinks (${units} units)",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 🔹 Logout Button
+            Button(
+                onClick = {
+                    auth.signOut()
+                    navController.navigate(Screen.SignIn.route)
+                }
+            ) {
+                Text("Log Out")
+            }
         }
     }
 }
+
 
 
 // 🔹 Add Alcohol Screen
@@ -361,23 +381,56 @@ fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
 fun ListScreen(sharedViewModel: AlcoholViewModel) {
     val alcoholList by sharedViewModel.alcoholList.collectAsState()
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
     ) {
-        Text(text = "Alcohol List", style = MaterialTheme.typography.headlineMedium)
+        // Background Image
+        Image(
+            painter = painterResource(id = R.drawable.list_background_2), // Ensure your file is named correctly
+            contentDescription = "Background Image",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
 
-        LazyColumn {
-            items(alcoholList.entries.toList()) { (alcohol, count) ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(text = "${alcohol.drinkName} (${alcohol.brandName})", style = MaterialTheme.typography.bodyLarge)
-                    Text(text = count.toString(), style = MaterialTheme.typography.bodyLarge)
-                    Button(onClick = { sharedViewModel.removeAlcohol(alcohol) }) {
-                        Text("Remove")
+        // Overlay Content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f)) // Optional dark overlay
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Top,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Alcohol List",
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.White // Ensure text is readable over the background
+            )
+
+            LazyColumn {
+                items(alcoholList.entries.toList()) { (alcohol, count) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                            .background(Color.White.copy(alpha = 0.8f), shape = RoundedCornerShape(8.dp)) // Slight background for contrast
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "${alcohol.drinkName} (${alcohol.brandName})",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.Black
+                        )
+                        Text(
+                            text = count.toString(),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.Black
+                        )
+                        Button(onClick = { sharedViewModel.removeAlcohol(alcohol) }) {
+                            Text("Remove")
+                        }
                     }
                 }
             }
