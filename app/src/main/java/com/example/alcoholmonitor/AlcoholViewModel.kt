@@ -1,5 +1,7 @@
 package com.example.alcoholmonitor
 
+import android.content.Context
+import android.os.Environment
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -8,6 +10,9 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.io.File
+import java.io.FileWriter
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -179,5 +184,28 @@ class AlcoholViewModel : ViewModel() {
                 onError(exception)
             }
     }
+
+    fun exportDataToCSV(context: Context, dataList: List<AlcoholItem>): File? {
+        val fileName = "alcohol_consumption.csv"
+        val directory = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+        val file = File(directory, fileName)
+
+        try {
+            FileWriter(file).use { writer ->
+                // Write CSV headers
+                writer.append("Drink Name,Brand Name,Type,ABV,Calories,Carbohydrates,Sugars,Proteins,Fats,Serving Size,Alcohol Units\n")
+
+                // Write each AlcoholItem as a row in the CSV
+                for (entry in dataList) {
+                    writer.append("${entry.drinkName},${entry.brandName},${entry.type},${entry.abv},${entry.calories},${entry.carbohydrates},${entry.sugars},${entry.proteins},${entry.fats},${entry.servingSize},${entry.alcoholUnits}\n")
+                }
+            }
+            return file // Return the CSV file
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        return null // Return null if the file creation fails
+    }
+
 
 }

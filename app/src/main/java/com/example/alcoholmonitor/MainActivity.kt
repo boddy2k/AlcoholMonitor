@@ -68,6 +68,9 @@ class MainActivity : ComponentActivity() {
 
         val alcoholViewModel = AlcoholViewModel() // Initialize ViewModel
 
+        // Trigger the CSV export test
+        //alcoholViewModel.exportTestData(this)
+
         setContent {
             AlcoholMonitorTheme {
                 val navController = rememberNavController()
