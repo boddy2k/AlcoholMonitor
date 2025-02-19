@@ -116,30 +116,38 @@ class AlcoholViewModel : ViewModel() {
             val currentCount = (drinkData["count"] as? Long) ?: 0L
             val currentUnits = (drinkData["units"] as? Double) ?: 0.0
 
-            // Update values, ensuring count and units never go negative
+            // Compute new values, ensuring count and units never go negative
             val newCount = (currentCount + count).coerceAtLeast(0)
             val newUnits = (currentUnits + (count * alcohol.alcoholUnits)).coerceAtLeast(0.0)
+
+            Log.d("Firestore", "Updating ${alcohol.drinkName}: Current Count=$currentCount, New Count=$newCount")
 
             if (newCount > 0) {
                 // Update or add the drink entry
                 currentData[alcohol.drinkName] = mapOf("count" to newCount, "units" to newUnits)
+                Log.d("Firestore", "Updated drink entry: $currentData")
             } else {
                 // Remove the drink if count is zero
                 currentData.remove(alcohol.drinkName)
+                Log.d("Firestore", "Removed drink entry: ${alcohol.drinkName}")
             }
 
             if (currentData.isEmpty()) {
                 // Remove the week's entry if no drinks remain
                 transaction.delete(docRef)
+                Log.d("Firestore", "Deleted entire week's document: $weekId")
             } else {
+                // Update the document with the modified data
                 transaction.set(docRef, currentData, SetOptions.merge())
+                Log.d("Firestore", "Updated alcohol intake in Firestore: $currentData")
             }
         }.addOnSuccessListener {
-            Log.d("Firestore", "Alcohol intake successfully updated: ${alcohol.drinkName} -> Drinks=$count, Units=${count * alcohol.alcoholUnits}")
+            Log.d("Firestore", "Successfully updated alcohol intake for ${alcohol.drinkName} -> Count Change=$count, Total Units=${count * alcohol.alcoholUnits}")
         }.addOnFailureListener { e ->
             Log.e("Firestore", "Error updating alcohol intake", e)
         }
     }
+
 
 
 

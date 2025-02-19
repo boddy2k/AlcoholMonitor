@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -254,7 +255,7 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
         modifier = Modifier.fillMaxSize()
     ) {
         Image(
-            painter = painterResource(id = R.drawable.account_background), // Replace with actual drawable name
+            painter = painterResource(id = R.drawable.account__screen_bg), // Replace with actual drawable name
             contentDescription = "Account Background",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
@@ -332,49 +333,68 @@ fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
         )
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally
+    // 🔹 Background Wrapper
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
-        // 🔍 Search Bar
-        TextField(
-            value = searchText,
-            onValueChange = { newText ->
-                searchText = newText
-                searchAlcoholBrands(newText) { results ->
-                    searchResults = results
-                }
-            },
-            label = { Text("Search Alcohol Brand") },
-            modifier = Modifier.fillMaxWidth()
+        // Background Image
+        Image(
+            painter = painterResource(id = R.drawable.add_alcohol_bg), // Ensure correct file name
+            contentDescription = "Add Alcohol Background",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // Overlay Content
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f)) // Optional dark overlay for better contrast
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Top,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // 🔍 Search Bar
+            TextField(
+                value = searchText,
+                onValueChange = { newText ->
+                    searchText = newText
+                    searchAlcoholBrands(newText) { results ->
+                        searchResults = results
+                    }
+                },
+                label = { Text("Search Alcohol Brand", color = Color.White) },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = TextStyle(color = Color.White)
+            )
 
-        // 🔎 Display Search Results (Drinks Only)
-        LazyColumn {
-            items(searchResults) { alcohol ->
-                Button(
-                    onClick = { sharedViewModel.addAlcohol(alcohol) }, // ✅ Add drink when clicked
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("${alcohol.drinkName} (${alcohol.brandName})")
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 🔎 Display Search Results (Drinks Only)
+            LazyColumn {
+                items(searchResults) { alcohol ->
+                    Button(
+                        onClick = { sharedViewModel.addAlcohol(alcohol) }, // ✅ Add drink when clicked
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("${alcohol.drinkName} (${alcohol.brandName})")
+                    }
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 🧮 Display Total Nutrition Data
+            Text(text = "Total Nutrition Added:", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+            Text(text = "Calories: $totalCalories kcal", color = Color.White)
+            Text(text = "Carbohydrates: $totalCarbs g", color = Color.White)
+            Text(text = "Fats: $totalFat g", color = Color.White)
+            Text(text = "Proteins: $totalProtein g", color = Color.White)
+            Text(text = "Alcohol Units: $totalAlcoholUnits", color = Color.White)
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 🧮 Display Total Nutrition Data
-        Text(text = "Total Nutrition Added:", style = MaterialTheme.typography.headlineMedium)
-        Text(text = "Calories: $totalCalories kcal")
-        Text(text = "Carbohydrates: $totalCarbs g")
-        Text(text = "Fats: $totalFat g")
-        Text(text = "Proteins: $totalProtein g")
-        Text(text = "Alcohol Units: $totalAlcoholUnits")
     }
 }
+
 
 // 🔹 List Screen
 @Composable
@@ -387,7 +407,7 @@ fun ListScreen(sharedViewModel: AlcoholViewModel) {
     ) {
         // Background Image
         Image(
-            painter = painterResource(id = R.drawable.list_background_2), // Ensure your file is named correctly
+            painter = painterResource(id = R.drawable.list_screen_bg1), // Ensure your file is named correctly
             contentDescription = "Background Image",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
