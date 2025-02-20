@@ -385,9 +385,8 @@ class AlcoholViewModel : ViewModel() {
 
     fun uploadCSVToKaggle(context: Context, file: File) {
         val kaggleApiKey = loadKaggleApiKey(context) ?: return
-        val datasetId = "boddy2k/alcohol-consumption-data" // ✅ Correct dataset ID
+        val datasetId = "boddy2k/alcohol-consumption-data"
 
-        // ✅ Step 1: Create ZIP file
         val zipFile = File(file.parent, "${file.nameWithoutExtension}.zip")
         ZipOutputStream(FileOutputStream(zipFile)).use { zipOut ->
             FileInputStream(file).use { fis ->
@@ -399,12 +398,12 @@ class AlcoholViewModel : ViewModel() {
 
         val client = OkHttpClient()
         val jsonBody = """
-        {
-            "id": "$datasetId",
-            "title": "Alcohol Consumption Data",
-            "description": "Weekly alcohol intake logs",
-            "isPublic": true
-        }
+    {
+        "id": "$datasetId",
+        "title": "Alcohol Consumption Data",
+        "description": "Weekly alcohol intake logs",
+        "isPublic": true
+    }
     """.trimIndent()
 
         val requestBody = MultipartBody.Builder()
@@ -414,7 +413,7 @@ class AlcoholViewModel : ViewModel() {
             .build()
 
         val request = Request.Builder()
-            .url("https://www.kaggle.com/api/v1/datasets/create/version") // ✅ Correct API endpoint
+            .url("https://www.kaggle.com/api/v1/datasets/create/version")
             .addHeader("Authorization", "Bearer $kaggleApiKey")
             .addHeader("Content-Type", "multipart/form-data")
             .post(requestBody)
