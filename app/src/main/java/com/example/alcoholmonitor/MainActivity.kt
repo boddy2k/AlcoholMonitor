@@ -291,7 +291,7 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
         Button(
             onClick = {
                 user?.uid?.let { userId ->
-                    sharedViewModel.uploadWeeklyDataToKaggle(context, userId) // ✅ Trigger Kaggle Upload
+                    sharedViewModel.uploadCSVToKaggle(context, userId) // ✅ Trigger Kaggle Upload
                 }
             }
         ) {

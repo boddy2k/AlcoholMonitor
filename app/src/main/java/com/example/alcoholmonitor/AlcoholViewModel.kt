@@ -324,23 +324,7 @@ class AlcoholViewModel : ViewModel() {
             }
     }
 
-    fun uploadWeeklyDataToKaggle(context: Context, userId: String) {
-        fetchWeeklyAlcoholData(userId) { weeklyData ->
-            if (weeklyData.isNotEmpty()) {
-                val csvFile = exportWeeklyDataToCSV(context, weeklyData)
-                if (csvFile != null) {
-                    Log.d("Kaggle", "✅ CSV successfully created for upload: ${csvFile.absolutePath}")
 
-                    // ✅ Now we call uploadCSVToKaggle() to actually send the file
-                    uploadCSVToKaggle(context, csvFile)
-                } else {
-                    Log.e("Kaggle", "❌ Failed to create CSV file.")
-                }
-            } else {
-                Log.d("Kaggle", "⚠ No weekly data available for Kaggle upload.")
-            }
-        }
-    }
 
 
     fun exportWeeklyDataToCSV(context: Context, dataList: Map<AlcoholItem, Int>): File? {
@@ -383,66 +367,71 @@ class AlcoholViewModel : ViewModel() {
     }
 
 
-    fun uploadCSVToKaggle(context: Context, file: File) {
-        val kaggleApiKey = loadKaggleApiKey(context) ?: return
-        val datasetId = "boddy2k/alcohol-consumption-data"
+    fun uploadCSVToKaggle(context: Context, userId: String) {
+        fetchWeeklyAlcoholData(userId) { weeklyData ->
+            if (weeklyData.isNotEmpty()) {
+                val csvFile = exportWeeklyDataToCSV(context, weeklyData)
+                if (csvFile != null) {
+                    Log.d("Kaggle", "✅ CSV successfully created for upload: ${csvFile.absolutePath}")
 
-        val zipFile = File(file.parent, "${file.nameWithoutExtension}.zip")
-        ZipOutputStream(FileOutputStream(zipFile)).use { zipOut ->
-            FileInputStream(file).use { fis ->
-                val zipEntry = ZipEntry(file.name)
-                zipOut.putNextEntry(zipEntry)
-                fis.copyTo(zipOut)
+                    // ✅ Convert CSV to ZIP before uploading
+                    val zipFile = File(csvFile.parent, "${csvFile.nameWithoutExtension}.zip")
+                    ZipOutputStream(FileOutputStream(zipFile)).use { zipOut ->
+                        FileInputStream(csvFile).use { fis ->
+                            val zipEntry = ZipEntry(csvFile.name)
+                            zipOut.putNextEntry(zipEntry)
+                            fis.copyTo(zipOut)
+                        }
+                    }
+
+                    val kaggleApiKey = loadKaggleApiKey(context) ?: return@fetchWeeklyAlcoholData
+
+                    val datasetId = "boddy2k/alcohol-consumption-data"
+
+                    val client = OkHttpClient()
+                    val jsonBody = """
+                {
+                    "id": "$datasetId",
+                    "title": "Alcohol Consumption Data",
+                    "description": "Weekly alcohol intake logs",
+                    "isPublic": true
+                }
+                """.trimIndent()
+
+                    val requestBody = MultipartBody.Builder()
+                        .setType(MultipartBody.FORM)
+                        .addFormDataPart("json", jsonBody)
+                        .addFormDataPart("file", zipFile.name, zipFile.asRequestBody("application/zip".toMediaTypeOrNull()))
+                        .build()
+
+                    val request = Request.Builder()
+                        .url("https://www.kaggle.com/api/v1/datasets/create/version")
+                        .addHeader("Authorization", "Bearer $kaggleApiKey")
+                        .addHeader("Content-Type", "multipart/form-data")
+                        .post(requestBody)
+                        .build()
+
+                    client.newCall(request).enqueue(object : Callback {
+                        override fun onFailure(call: Call, e: IOException) {
+                            Log.e("Kaggle", "❌ Upload failed", e)
+                        }
+
+                        override fun onResponse(call: Call, response: Response) {
+                            val responseBody = response.body?.string()
+                            if (response.isSuccessful) {
+                                Log.d("Kaggle", "✅ Upload successful!")
+                            } else {
+                                Log.e("Kaggle", "❌ Upload failed: ${response.code} - ${response.message}")
+                                Log.e("Kaggle", "❌ Response body: $responseBody")
+                            }
+                        }
+                    })
+                } else {
+                    Log.e("Kaggle", "❌ Failed to create CSV file.")
+                }
+            } else {
+                Log.d("Kaggle", "⚠ No weekly data available for Kaggle upload.")
             }
         }
-
-        val client = OkHttpClient()
-        val jsonBody = """
-    {
-        "id": "$datasetId",
-        "title": "Alcohol Consumption Data",
-        "description": "Weekly alcohol intake logs",
-        "isPublic": true
     }
-    """.trimIndent()
-
-        val requestBody = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("json", jsonBody)
-            .addFormDataPart("file", zipFile.name, zipFile.asRequestBody("application/zip".toMediaTypeOrNull()))
-            .build()
-
-        val request = Request.Builder()
-            .url("https://www.kaggle.com/api/v1/datasets/create/version")
-            .addHeader("Authorization", "Bearer $kaggleApiKey")
-            .addHeader("Content-Type", "multipart/form-data")
-            .post(requestBody)
-            .build()
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e("Kaggle", "❌ Upload failed", e)
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                val responseBody = response.body?.string()
-                if (response.isSuccessful) {
-                    Log.d("Kaggle", "✅ Upload successful!")
-                } else {
-                    Log.e("Kaggle", "❌ Upload failed: ${response.code} - ${response.message}")
-                    Log.e("Kaggle", "❌ Response body: $responseBody")
-                }
-            }
-        })
-    }
-
-
-
-
-
-
-
-
-
-
 }
