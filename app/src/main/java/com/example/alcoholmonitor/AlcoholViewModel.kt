@@ -1,7 +1,5 @@
 package com.example.alcoholmonitor
 
-import android.content.Context
-import android.os.Environment
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -11,9 +9,6 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.io.File
-import java.io.FileWriter
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -38,6 +33,13 @@ class AlcoholViewModel : ViewModel() {
 
     private val _totalAlcohol = MutableStateFlow(0.0)
     val totalAlcohol: StateFlow<Double> = _totalAlcohol
+
+    init {
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user != null) {
+            fetchAlcoholIntake(user.uid) // 🔥 Restore list on startup
+        }
+    }
 
     fun addAlcohol(alcohol: AlcoholItem) {
         Log.d("ViewModel", "addAlcohol() called for ${alcohol.drinkName}")
@@ -158,11 +160,7 @@ class AlcoholViewModel : ViewModel() {
 
 
 
-    fun fetchAlcoholIntake(
-        userId: String,
-        onComplete: (Map<String, Map<String, Any>>) -> Unit,
-        onError: (Exception) -> Unit
-    ) {
+    fun fetchAlcoholIntake(userId: String) {
         val db = Firebase.firestore
         val calendar = Calendar.getInstance()
         val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(calendar.time)
@@ -176,38 +174,73 @@ class AlcoholViewModel : ViewModel() {
                     val data = document.data?.mapValues { entry ->
                         entry.value as? Map<String, Any> ?: emptyMap()
                     } ?: emptyMap()
-                    onComplete(data)
+
+                    // 🔥 Convert Firestore data back into AlcoholItem list & restore nutrition totals
+                    val restoredList = mutableMapOf<AlcoholItem, Int>()
+                    var totalCalories = 0.0
+                    var totalCarbs = 0.0
+                    var totalFat = 0.0
+                    var totalProtein = 0.0
+                    var totalAlcoholUnits = 0.0
+
+                    data.forEach { (drinkName, drinkData) ->
+                        val count = (drinkData["count"] as? Long)?.toInt() ?: 0
+                        val units = (drinkData["units"] as? Double) ?: 0.0
+
+                        if (count > 0) {
+                            // Create a placeholder AlcoholItem (real details should be retrieved properly)
+                            val alcoholItem = AlcoholItem(
+                                drinkName = drinkName,
+                                brandName = "",  // Data missing; needs a better retrieval approach
+                                type = "",
+                                abv = 0.0,
+                                calories = 100.0, // Placeholder value
+                                carbohydrates = "10g",
+                                sugars = "5g",
+                                proteins = "2g",
+                                fats = "1g",
+                                servingSize = "",
+                                alcoholUnits = units
+                            )
+
+                            restoredList[alcoholItem] = count
+
+                            // 🔥 Restore nutrition totals
+                            totalCalories += alcoholItem.calories * count
+                            totalCarbs += alcoholItem.getCarbohydratesAsDouble() * count
+                            totalFat += alcoholItem.getFatsAsDouble() * count
+                            totalProtein += alcoholItem.getProteinsAsDouble() * count
+                            totalAlcoholUnits += alcoholItem.alcoholUnits * count
+                        }
+                    }
+
+                    // 🔥 Restore the list
+                    _alcoholList.value = restoredList
+
+                    // 🔥 Restore total values
+                    _totalCalories.value = totalCalories
+                    _totalCarbs.value = totalCarbs
+                    _totalFat.value = totalFat
+                    _totalProtein.value = totalProtein
+                    _totalAlcohol.value = totalAlcoholUnits
+
+                    Log.d("Firestore", "Restored alcohol list: $restoredList")
+                    Log.d("Firestore", "Restored Nutrition - Calories: $totalCalories, Carbs: $totalCarbs, Fat: $totalFat, Protein: $totalProtein, Units: $totalAlcoholUnits")
                 } else {
-                    onComplete(emptyMap()) // No data found for this week
+                    Log.d("Firestore", "No alcohol intake data found for this week.")
+                    _alcoholList.value = emptyMap()
+                    _totalCalories.value = 0.0
+                    _totalCarbs.value = 0.0
+                    _totalFat.value = 0.0
+                    _totalProtein.value = 0.0
+                    _totalAlcohol.value = 0.0
                 }
             }
             .addOnFailureListener { exception ->
                 Log.e("Firestore", "Error fetching alcohol intake", exception)
-                onError(exception)
             }
     }
 
-    fun exportDataToCSV(context: Context, dataList: List<AlcoholItem>): File? {
-        val fileName = "alcohol_consumption.csv"
-        val directory = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
-        val file = File(directory, fileName)
-
-        try {
-            FileWriter(file).use { writer ->
-                // Write CSV headers
-                writer.append("Drink Name,Brand Name,Type,ABV,Calories,Carbohydrates,Sugars,Proteins,Fats,Serving Size,Alcohol Units\n")
-
-                // Write each AlcoholItem as a row in the CSV
-                for (entry in dataList) {
-                    writer.append("${entry.drinkName},${entry.brandName},${entry.type},${entry.abv},${entry.calories},${entry.carbohydrates},${entry.sugars},${entry.proteins},${entry.fats},${entry.servingSize},${entry.alcoholUnits}\n")
-                }
-            }
-            return file // Return the CSV file
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
-        return null // Return null if the file creation fails
-    }
 
 
 }

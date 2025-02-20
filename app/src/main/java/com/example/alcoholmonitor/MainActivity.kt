@@ -240,75 +240,57 @@ fun SignInScreen(navController: NavController, auth: FirebaseAuth) {
 @Composable
 fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewModel: AlcoholViewModel) {
     val user = auth.currentUser
-    var weeklyIntake by remember { mutableStateOf<Map<String, Map<String, Any>>>(emptyMap()) }
+
+    // 🔹 Observe the alcohol list from ViewModel
+    val alcoholList by sharedViewModel.alcoholList.collectAsState()
 
     // 🔹 Fetch weekly intake when the screen loads
     LaunchedEffect(user) {
         user?.uid?.let { userId ->
-            sharedViewModel.fetchAlcoholIntake(
-                userId = userId,
-                onComplete = { data -> weeklyIntake = data },
-                onError = { error -> Log.e("Firestore", "Error fetching alcohol intake", error) }
-            )
+            sharedViewModel.fetchAlcoholIntake(userId) // ✅ Fetch data on screen load
         }
     }
 
-    // 🔹 Background Image
-    Box(
-        modifier = Modifier.fillMaxSize()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.account__screen_bg), // Replace with actual drawable name
-            contentDescription = "Account Background",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        Text(text = "Account Details", style = MaterialTheme.typography.headlineMedium)
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.CenterHorizontally
+        user?.email?.let {
+            Text(text = "Email: $it", style = MaterialTheme.typography.bodyLarge)
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 🔹 Weekly Alcohol Intake Section
+        Text(text = "Weekly Alcohol Intake", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (alcoholList.isEmpty()) {
+            Text(text = "No alcohol logged this week", style = MaterialTheme.typography.bodyLarge)
+        } else {
+            alcoholList.forEach { (drink, count) ->
+                Text(
+                    text = "${drink.drinkName}: $count drinks (${drink.alcoholUnits} units)",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 🔹 Logout Button
+        Button(
+            onClick = {
+                auth.signOut()
+                navController.navigate(Screen.SignIn.route)
+            }
         ) {
-            Text(text = "Account Details", style = MaterialTheme.typography.headlineMedium, color = Color.White)
-
-            user?.email?.let {
-                Text(text = "Email: $it", style = MaterialTheme.typography.bodyLarge, color = Color.White)
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 🔹 Weekly Alcohol Intake Section
-            Text(text = "Weekly Alcohol Intake", style = MaterialTheme.typography.titleMedium, color = Color.White)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (weeklyIntake.isEmpty()) {
-                Text(text = "No alcohol logged this week", style = MaterialTheme.typography.bodyLarge, color = Color.White)
-            } else {
-                weeklyIntake.forEach { (drinkName, drinkData) ->
-                    val count = (drinkData["count"] as? Long) ?: 0L
-                    val units = (drinkData["units"] as? Double) ?: 0.0
-
-                    Text(
-                        text = "$drinkName: $count drinks (${units} units)",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 🔹 Logout Button
-            Button(
-                onClick = {
-                    auth.signOut()
-                    navController.navigate(Screen.SignIn.route)
-                }
-            ) {
-                Text("Log Out")
-            }
+            Text("Log Out")
         }
     }
 }
