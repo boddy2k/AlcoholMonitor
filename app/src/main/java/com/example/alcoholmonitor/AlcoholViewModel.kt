@@ -5,6 +5,7 @@ import android.os.Environment
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -134,6 +135,7 @@ class AlcoholViewModel : ViewModel() {
             } else {
                 // Remove the drink if count is zero
                 currentData.remove(alcohol.drinkName)
+                transaction.update(docRef, mapOf(alcohol.drinkName to FieldValue.delete()))
                 Log.d("Firestore", "Removed drink entry: ${alcohol.drinkName}")
             }
 
