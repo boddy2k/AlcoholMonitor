@@ -79,4 +79,5 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.5")
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("androidx.compose.ui:ui-text-google-fonts:1.2.0")
+    implementation("com.squareup.okhttp3:okhttp:4.9.3")
 }

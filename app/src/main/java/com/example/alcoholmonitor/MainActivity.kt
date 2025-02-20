@@ -1,5 +1,6 @@
 package com.example.alcoholmonitor
 
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -41,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -127,17 +129,20 @@ fun searchAlcoholBrands(query: String, onResult: (List<AlcoholItem>) -> Unit) {
 // 🔹 Main Navigation
 @Composable
 fun NavigationHost(navController: NavHostController, sharedViewModel: AlcoholViewModel, modifier: Modifier = Modifier) {
+    val context = LocalContext.current // ✅ Get the current context
+
     NavHost(
         navController = navController,
         startDestination = Screen.SignIn.route,
         modifier = modifier
     ) {
-        composable(Screen.SignIn.route) { SignInScreen(navController = navController, auth = auth) }
-        composable(Screen.Account.route) { AccountScreen(navController = navController, auth = auth, sharedViewModel = sharedViewModel) }
+        composable(Screen.SignIn.route) { SignInScreen(navController = navController, auth = FirebaseAuth.getInstance()) }
+        composable(Screen.Account.route) { AccountScreen(navController = navController, auth = FirebaseAuth.getInstance(), sharedViewModel = sharedViewModel, context = context) }
         composable(Screen.AddAlcohol.route) { AddAlcoholScreen(sharedViewModel) }
         composable(Screen.List.route) { ListScreen(sharedViewModel) }
     }
 }
+
 
 // 🔹 Sign-In Screen
 @Composable
@@ -238,7 +243,7 @@ fun SignInScreen(navController: NavController, auth: FirebaseAuth) {
 
 // 🔹 Account Screen
 @Composable
-fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewModel: AlcoholViewModel) {
+fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewModel: AlcoholViewModel, context: Context) {
     val user = auth.currentUser
 
     // 🔹 Observe the alcohol list from ViewModel
@@ -247,7 +252,7 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
     // 🔹 Fetch weekly intake when the screen loads
     LaunchedEffect(user) {
         user?.uid?.let { userId ->
-            sharedViewModel.fetchAlcoholIntake(userId) // ✅ Fetch data on screen load
+            sharedViewModel.fetchAlcoholIntake(userId) // ✅ Fetch weekly data on screen load
         }
     }
 
@@ -266,7 +271,6 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 🔹 Weekly Alcohol Intake Section
         Text(text = "Weekly Alcohol Intake", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -283,6 +287,19 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 🔹 Upload Weekly Data to Kaggle Button
+        Button(
+            onClick = {
+                user?.uid?.let { userId ->
+                    sharedViewModel.uploadWeeklyDataToKaggle(context, userId) // ✅ Trigger Kaggle Upload
+                }
+            }
+        ) {
+            Text("Upload Weekly Data to Kaggle")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // 🔹 Logout Button
         Button(
             onClick = {
@@ -294,6 +311,8 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
         }
     }
 }
+
+
 
 
 

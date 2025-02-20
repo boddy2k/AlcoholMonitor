@@ -1,5 +1,7 @@
 package com.example.alcoholmonitor
 
+import android.content.Context
+import android.os.Environment
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -9,10 +11,27 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.Response
+import org.json.JSONObject
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.FileWriter
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 class AlcoholViewModel : ViewModel() {
 
@@ -240,6 +259,190 @@ class AlcoholViewModel : ViewModel() {
                 Log.e("Firestore", "Error fetching alcohol intake", exception)
             }
     }
+
+    fun getOrCreateAnonId(context: Context): String {
+        val sharedPreferences = context.getSharedPreferences("KagglePrefs", Context.MODE_PRIVATE)
+        var anonId = sharedPreferences.getString("anon_user_id", null)
+
+        if (anonId == null) {
+            // Generate a new random anonymous ID
+            anonId = UUID.randomUUID().toString().take(8)  // Shorten the ID for readability
+            sharedPreferences.edit().putString("anon_user_id", anonId).apply()
+            Log.d("Kaggle", "Generated new anonymous ID: $anonId")
+        } else {
+            Log.d("Kaggle", "Using existing anonymous ID: $anonId")
+        }
+        return anonId
+    }
+
+    fun fetchWeeklyAlcoholData(userId: String, onComplete: (Map<AlcoholItem, Int>) -> Unit) {
+        val db = Firebase.firestore
+        val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(Calendar.getInstance().time)
+
+        val docRef = db.collection("users").document(userId)
+            .collection("alcohol_intake").document(weekId)
+
+        docRef.get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val data = document.data?.mapValues { entry ->
+                        entry.value as? Map<String, Any> ?: emptyMap()
+                    } ?: emptyMap()
+
+                    val alcoholData = mutableMapOf<AlcoholItem, Int>()
+                    data.forEach { (drinkName, drinkData) ->
+                        val count = (drinkData["count"] as? Long)?.toInt() ?: 0
+                        val units = (drinkData["units"] as? Double) ?: 0.0
+
+                        if (count > 0) {
+                            // ✅ Creating AlcoholItem with default placeholder values
+                            val alcoholItem = AlcoholItem(
+                                drinkName = drinkName,
+                                brandName = "Unknown",
+                                type = "Unknown",
+                                abv = 0.0,
+                                calories = 0.0,
+                                carbohydrates = "0g",
+                                sugars = "0g",
+                                proteins = "0g",
+                                fats = "0g",
+                                servingSize = "N/A",
+                                alcoholUnits = units
+                            )
+                            alcoholData[alcoholItem] = count
+                        }
+                    }
+
+                    onComplete(alcoholData)
+                } else {
+                    Log.d("Firestore", "No alcohol intake data found for this week.")
+                    onComplete(emptyMap()) // Return empty data if nothing is found
+                }
+            }
+            .addOnFailureListener { exception ->
+                Log.e("Firestore", "Error fetching weekly alcohol intake", exception)
+            }
+    }
+
+    fun uploadWeeklyDataToKaggle(context: Context, userId: String) {
+        fetchWeeklyAlcoholData(userId) { weeklyData ->
+            if (weeklyData.isNotEmpty()) {
+                val csvFile = exportWeeklyDataToCSV(context, weeklyData)
+                if (csvFile != null) {
+                    Log.d("Kaggle", "✅ CSV successfully created for upload: ${csvFile.absolutePath}")
+
+                    // ✅ Now we call uploadCSVToKaggle() to actually send the file
+                    uploadCSVToKaggle(context, csvFile)
+                } else {
+                    Log.e("Kaggle", "❌ Failed to create CSV file.")
+                }
+            } else {
+                Log.d("Kaggle", "⚠ No weekly data available for Kaggle upload.")
+            }
+        }
+    }
+
+
+    fun exportWeeklyDataToCSV(context: Context, dataList: Map<AlcoholItem, Int>): File? {
+        val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(Calendar.getInstance().time)
+        val fileName = "alcohol_weekly_${weekId}.csv"
+        val directory = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: return null
+        val file = File(directory, fileName)
+
+        try {
+            FileWriter(file).use { writer ->
+                // ✅ Write CSV headers
+                writer.append("Anon ID,Drink Name,Total Count,Alcohol Units,Week ID\n")
+
+                val anonId = getOrCreateAnonId(context) // Retrieve the anonymous user ID
+
+                // ✅ Write each AlcoholItem as a row in the CSV
+                dataList.forEach { (alcoholItem, count) ->
+                    writer.append("$anonId,${alcoholItem.drinkName},$count,${alcoholItem.alcoholUnits * count},$weekId\n")
+                }
+
+                Log.d("Kaggle", "✅ Weekly CSV file successfully created at: ${file.absolutePath}")
+            }
+            return file
+        } catch (e: IOException) {
+            Log.e("Kaggle", "❌ Error creating weekly CSV file", e)
+        }
+        return null
+    }
+
+    fun loadKaggleApiKey(context: Context): String? {
+        return try {
+            val inputStream = context.assets.open("kaggle.json")
+            val json = inputStream.bufferedReader().use { it.readText() }
+            val jsonObject = JSONObject(json)
+            jsonObject.getString("key") // ✅ Extract the API key from JSON
+        } catch (e: Exception) {
+            Log.e("Kaggle", "❌ Error loading Kaggle API key", e)
+            null
+        }
+    }
+
+
+    fun uploadCSVToKaggle(context: Context, file: File) {
+        val kaggleApiKey = loadKaggleApiKey(context) ?: return
+        val datasetId = "boddy2k/alcohol-consumption-data" // ✅ Correct dataset ID
+
+        // ✅ Step 1: Create ZIP file
+        val zipFile = File(file.parent, "${file.nameWithoutExtension}.zip")
+        ZipOutputStream(FileOutputStream(zipFile)).use { zipOut ->
+            FileInputStream(file).use { fis ->
+                val zipEntry = ZipEntry(file.name)
+                zipOut.putNextEntry(zipEntry)
+                fis.copyTo(zipOut)
+            }
+        }
+
+        val client = OkHttpClient()
+        val jsonBody = """
+        {
+            "id": "$datasetId",
+            "title": "Alcohol Consumption Data",
+            "description": "Weekly alcohol intake logs",
+            "isPublic": true
+        }
+    """.trimIndent()
+
+        val requestBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("json", jsonBody)
+            .addFormDataPart("file", zipFile.name, zipFile.asRequestBody("application/zip".toMediaTypeOrNull()))
+            .build()
+
+        val request = Request.Builder()
+            .url("https://www.kaggle.com/api/v1/datasets/create/version") // ✅ Correct API endpoint
+            .addHeader("Authorization", "Bearer $kaggleApiKey")
+            .addHeader("Content-Type", "multipart/form-data")
+            .post(requestBody)
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                Log.e("Kaggle", "❌ Upload failed", e)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val responseBody = response.body?.string()
+                if (response.isSuccessful) {
+                    Log.d("Kaggle", "✅ Upload successful!")
+                } else {
+                    Log.e("Kaggle", "❌ Upload failed: ${response.code} - ${response.message}")
+                    Log.e("Kaggle", "❌ Response body: $responseBody")
+                }
+            }
+        })
+    }
+
+
+
+
+
+
+
 
 
 
