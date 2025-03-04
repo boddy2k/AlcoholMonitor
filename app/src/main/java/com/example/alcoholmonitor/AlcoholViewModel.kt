@@ -1,8 +1,10 @@
 package com.example.alcoholmonitor
 
 import android.content.Context
+import android.os.Build
 import android.os.Environment
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -19,10 +21,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.Response
-import org.json.JSONObject
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.io.FileWriter
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -30,8 +29,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 class AlcoholViewModel : ViewModel() {
 
@@ -327,6 +324,7 @@ class AlcoholViewModel : ViewModel() {
 
 
 
+    @RequiresApi(Build.VERSION_CODES.FROYO)
     fun exportWeeklyDataToCSV(context: Context, dataList: Map<AlcoholItem, Int>): File? {
         val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(Calendar.getInstance().time)
         val fileName = "alcohol_weekly_${weekId}.csv"
@@ -354,84 +352,47 @@ class AlcoholViewModel : ViewModel() {
         return null
     }
 
-    fun loadKaggleApiKey(context: Context): String? {
-        return try {
-            val inputStream = context.assets.open("kaggle.json")
-            val json = inputStream.bufferedReader().use { it.readText() }
-            val jsonObject = JSONObject(json)
-            jsonObject.getString("key") // ✅ Extract the API key from JSON
-        } catch (e: Exception) {
-            Log.e("Kaggle", "❌ Error loading Kaggle API key", e)
-            null
-        }
-    }
 
-
-    fun uploadCSVToKaggle(context: Context, userId: String) {
+    fun sendCsvToFlaskServer(context: Context, userId: String) {
         fetchWeeklyAlcoholData(userId) { weeklyData ->
             if (weeklyData.isNotEmpty()) {
                 val csvFile = exportWeeklyDataToCSV(context, weeklyData)
                 if (csvFile != null) {
-                    Log.d("Kaggle", "✅ CSV successfully created for upload: ${csvFile.absolutePath}")
-
-                    // ✅ Convert CSV to ZIP before uploading
-                    val zipFile = File(csvFile.parent, "${csvFile.nameWithoutExtension}.zip")
-                    ZipOutputStream(FileOutputStream(zipFile)).use { zipOut ->
-                        FileInputStream(csvFile).use { fis ->
-                            val zipEntry = ZipEntry(csvFile.name)
-                            zipOut.putNextEntry(zipEntry)
-                            fis.copyTo(zipOut)
-                        }
-                    }
-
-                    val kaggleApiKey = loadKaggleApiKey(context) ?: return@fetchWeeklyAlcoholData
-
-                    val datasetId = "boddy2k/alcohol-consumption-data"
-
-                    val client = OkHttpClient()
-                    val jsonBody = """
-                {
-                    "id": "$datasetId",
-                    "title": "Alcohol Consumption Data",
-                    "description": "Weekly alcohol intake logs",
-                    "isPublic": true
-                }
-                """.trimIndent()
+                    val flaskUrl = "http://10.0.2.2:5000/upload"
 
                     val requestBody = MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
-                        .addFormDataPart("json", jsonBody)
-                        .addFormDataPart("file", zipFile.name, zipFile.asRequestBody("application/zip".toMediaTypeOrNull()))
+                        .addFormDataPart("file", csvFile.name, csvFile.asRequestBody("text/csv".toMediaTypeOrNull()))
                         .build()
 
                     val request = Request.Builder()
-                        .url("https://www.kaggle.com/api/v1/datasets/create/version")
-                        .addHeader("Authorization", "Bearer $kaggleApiKey")
-                        .addHeader("Content-Type", "multipart/form-data")
+                        .url(flaskUrl)
                         .post(requestBody)
                         .build()
 
+                    val client = OkHttpClient()
+
                     client.newCall(request).enqueue(object : Callback {
                         override fun onFailure(call: Call, e: IOException) {
-                            Log.e("Kaggle", "❌ Upload failed", e)
+                            Log.e("FlaskUpload", "❌ Upload failed", e)
                         }
 
                         override fun onResponse(call: Call, response: Response) {
-                            val responseBody = response.body?.string()
                             if (response.isSuccessful) {
-                                Log.d("Kaggle", "✅ Upload successful!")
+                                Log.d("FlaskUpload", "✅ Upload successful!")
                             } else {
-                                Log.e("Kaggle", "❌ Upload failed: ${response.code} - ${response.message}")
-                                Log.e("Kaggle", "❌ Response body: $responseBody")
+                                Log.e("FlaskUpload", "❌ Upload failed: ${response.code} - ${response.message}")
                             }
                         }
                     })
                 } else {
-                    Log.e("Kaggle", "❌ Failed to create CSV file.")
+                    Log.e("FlaskUpload", "❌ Failed to create CSV file.")
                 }
             } else {
-                Log.d("Kaggle", "⚠ No weekly data available for Kaggle upload.")
+                Log.d("FlaskUpload", "⚠ No weekly data available to upload.")
             }
         }
     }
+
+
 }
