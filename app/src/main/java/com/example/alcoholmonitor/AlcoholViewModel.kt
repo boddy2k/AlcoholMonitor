@@ -148,8 +148,10 @@ class AlcoholViewModel : ViewModel() {
 
             if (newCount > 0) {
                 // Update or add the drink entry
-                currentData[alcohol.drinkName] = mapOf("count" to newCount, "units" to newUnits)
-                Log.d("Firestore", "Updated drink entry: $currentData")
+                currentData[alcohol.drinkName] = mapOf(
+                    "count" to newCount,
+                    "unitsPerDrink" to alcohol.alcoholUnits  // ✅ Always the "per drink" units from Firestore, never multiplied
+                )
             } else {
                 // Remove the drink if count is zero
                 currentData.remove(alcohol.drinkName)
@@ -178,83 +180,101 @@ class AlcoholViewModel : ViewModel() {
 
     fun fetchAlcoholIntake(userId: String) {
         val db = Firebase.firestore
-        val calendar = Calendar.getInstance()
-        val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(calendar.time)
+        val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(Calendar.getInstance().time)
 
         val docRef = db.collection("users").document(userId)
             .collection("alcohol_intake").document(weekId)
 
-        docRef.get()
-            .addOnSuccessListener { document ->
-                if (document.exists()) {
-                    val data = document.data?.mapValues { entry ->
-                        entry.value as? Map<String, Any> ?: emptyMap()
-                    } ?: emptyMap()
+        docRef.get().addOnSuccessListener { document ->
+            if (document.exists()) {
+                val data = document.data?.mapValues { entry ->
+                    entry.value as? Map<String, Any> ?: emptyMap()
+                } ?: emptyMap()
 
-                    // 🔥 Convert Firestore data back into AlcoholItem list & restore nutrition totals
-                    val restoredList = mutableMapOf<AlcoholItem, Int>()
-                    var totalCalories = 0.0
-                    var totalCarbs = 0.0
-                    var totalFat = 0.0
-                    var totalProtein = 0.0
-                    var totalAlcoholUnits = 0.0
+                val restoredList = mutableMapOf<AlcoholItem, Int>()
+                var totalCalories = 0.0
+                var totalCarbs = 0.0
+                var totalFat = 0.0
+                var totalProtein = 0.0
+                var totalAlcoholUnits = 0.0
 
-                    data.forEach { (drinkName, drinkData) ->
-                        val count = (drinkData["count"] as? Long)?.toInt() ?: 0
-                        val units = (drinkData["units"] as? Double) ?: 0.0
+                val db = Firebase.firestore
+                val alcoholDataCollection = db.collection("alcohol_data")
 
-                        if (count > 0) {
-                            // Create a placeholder AlcoholItem (real details should be retrieved properly)
-                            val alcoholItem = AlcoholItem(
-                                drinkName = drinkName,
-                                brandName = "",  // Data missing; needs a better retrieval approach
-                                type = "",
-                                abv = 0.0,
-                                calories = 100.0, // Placeholder value
-                                carbohydrates = "10g",
-                                sugars = "5g",
-                                proteins = "2g",
-                                fats = "1g",
-                                servingSize = "",
-                                alcoholUnits = units
-                            )
+                // 🔄 Fetch full details for each drink
+                val fetchTasks = data.map { (drinkName, drinkData) ->
+                    val count = (drinkData["count"] as? Long)?.toInt() ?: 0
+                    val unitsPerDrink = (drinkData["unitsPerDrink"] as? Double) ?: 0.0
 
-                            restoredList[alcoholItem] = count
+                    alcoholDataCollection.whereEqualTo("Drink Name", drinkName).get()
+                        .addOnSuccessListener { result ->
+                            if (result.documents.isNotEmpty()) {
+                                val doc = result.documents.first()
 
-                            // 🔥 Restore nutrition totals
-                            totalCalories += alcoholItem.calories * count
-                            totalCarbs += alcoholItem.getCarbohydratesAsDouble() * count
-                            totalFat += alcoholItem.getFatsAsDouble() * count
-                            totalProtein += alcoholItem.getProteinsAsDouble() * count
-                            totalAlcoholUnits += alcoholItem.alcoholUnits * count
+                                val alcoholItem = AlcoholItem(
+                                    drinkName = drinkName,
+                                    brandName = doc.getString("Brand Name") ?: "Unknown",
+                                    type = doc.getString("Type") ?: "Unknown",
+                                    abv = doc.getDouble("ABV") ?: 0.0,
+                                    calories = doc.getDouble("Calories") ?: 0.0,
+                                    carbohydrates = doc.getString("Carbohydrates") ?: "0g",
+                                    sugars = doc.getString("Sugars") ?: "0g",
+                                    proteins = doc.getString("Proteins") ?: "0g",
+                                    fats = doc.getString("Fats") ?: "0g",
+                                    servingSize = doc.getString("Serving Size") ?: "Unknown",
+                                    alcoholUnits = unitsPerDrink // From weekly log, not alcohol_data
+                                )
+
+                                restoredList[alcoholItem] = count
+
+                                totalCalories += alcoholItem.calories * count
+                                totalCarbs += alcoholItem.getCarbohydratesAsDouble() * count
+                                totalFat += alcoholItem.getFatsAsDouble() * count
+                                totalProtein += alcoholItem.getProteinsAsDouble() * count
+                                totalAlcoholUnits += alcoholItem.alcoholUnits * count
+
+                                // If all drinks fetched, update state
+                                if (restoredList.size == data.size) {
+                                    _alcoholList.value = restoredList
+                                    _totalCalories.value = totalCalories
+                                    _totalCarbs.value = totalCarbs
+                                    _totalFat.value = totalFat
+                                    _totalProtein.value = totalProtein
+                                    _totalAlcohol.value = totalAlcoholUnits
+
+                                    Log.d("Firestore", "✅ Fully restored alcohol list: $restoredList")
+                                    Log.d("Firestore", "✅ Restored Nutrition Totals: Calories=$totalCalories, Carbs=$totalCarbs, Fat=$totalFat, Protein=$totalProtein, Units=$totalAlcoholUnits")
+                                }
+                            } else {
+                                Log.e("Firestore", "❌ No matching drink found in alcohol_data for $drinkName")
+                            }
+                        }.addOnFailureListener { e ->
+                            Log.e("Firestore", "❌ Error fetching drink details for $drinkName", e)
                         }
-                    }
-
-                    // 🔥 Restore the list
-                    _alcoholList.value = restoredList
-
-                    // 🔥 Restore total values
-                    _totalCalories.value = totalCalories
-                    _totalCarbs.value = totalCarbs
-                    _totalFat.value = totalFat
-                    _totalProtein.value = totalProtein
-                    _totalAlcohol.value = totalAlcoholUnits
-
-                    Log.d("Firestore", "Restored alcohol list: $restoredList")
-                    Log.d("Firestore", "Restored Nutrition - Calories: $totalCalories, Carbs: $totalCarbs, Fat: $totalFat, Protein: $totalProtein, Units: $totalAlcoholUnits")
-                } else {
-                    Log.d("Firestore", "No alcohol intake data found for this week.")
-                    _alcoholList.value = emptyMap()
-                    _totalCalories.value = 0.0
-                    _totalCarbs.value = 0.0
-                    _totalFat.value = 0.0
-                    _totalProtein.value = 0.0
-                    _totalAlcohol.value = 0.0
                 }
+
+                if (fetchTasks.isEmpty()) {
+                    // No data for this week, reset everything to zero
+                    resetNutritionAndList()
+                }
+            } else {
+                Log.d("Firestore", "⚠️ No alcohol intake data found for this week.")
+                resetNutritionAndList()
             }
-            .addOnFailureListener { exception ->
-                Log.e("Firestore", "Error fetching alcohol intake", exception)
-            }
+        }.addOnFailureListener { exception ->
+            Log.e("Firestore", "❌ Error fetching weekly alcohol intake", exception)
+            resetNutritionAndList()
+        }
+    }
+
+    private fun resetNutritionAndList() {
+        _alcoholList.value = emptyMap()
+        _totalCalories.value = 0.0
+        _totalCarbs.value = 0.0
+        _totalFat.value = 0.0
+        _totalProtein.value = 0.0
+        _totalAlcohol.value = 0.0
+        Log.d("Firestore", "🔄 Reset all nutrition data (no data found)")
     }
 
     fun getOrCreateAnonId(context: Context): String {

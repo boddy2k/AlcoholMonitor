@@ -279,8 +279,9 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
             Text(text = "No alcohol logged this week", style = MaterialTheme.typography.bodyLarge)
         } else {
             alcoholList.forEach { (drink, count) ->
+                val totalUnits = drink.alcoholUnits * count  // ✅ Correct calculation using per-drink units
                 Text(
-                    text = "${drink.drinkName}: $count drinks (${drink.alcoholUnits} units)",
+                    text = "${drink.drinkName}: $count drinks ($totalUnits units)",
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
@@ -293,7 +294,6 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
             onClick = {
                 user?.uid?.let { userId ->
                     sharedViewModel.sendCsvToFlaskServer(context, userId)
-
                 }
             }
         ) {
@@ -313,6 +313,7 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
         }
     }
 }
+
 
 
 
