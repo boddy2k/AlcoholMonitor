@@ -394,5 +394,21 @@ class AlcoholViewModel : ViewModel() {
         }
     }
 
+    fun calculateWarnings(): List<String> {
+        val warnings = mutableListOf<String>()
+
+        if (_totalAlcohol.value >= 2.5) {
+            warnings.add("🚗 UK motor regulation prohibits you from driving a vehicle once you have consumed 2.5 units of alcohol.")
+        }
+        if (_totalAlcohol.value >= 7) {
+            warnings.add("⚠️ You are halfway to the weekly recommended limit of alcohol consumption. Consider slowing down.")
+        }
+        if (_totalAlcohol.value >= 14) {
+            warnings.add("🚨 NHS guidelines recommend no more than 14 units of alcohol per week. You have reached this limit.")
+        }
+
+        return warnings
+    }
+
 
 }

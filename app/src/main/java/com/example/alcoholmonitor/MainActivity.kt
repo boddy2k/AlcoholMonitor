@@ -34,6 +34,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -322,6 +323,7 @@ fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewMo
 fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
     var searchText by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf(listOf<AlcoholItem>()) }
+    val warnings by remember { derivedStateOf { sharedViewModel.calculateWarnings() } }
 
     // ✅ Collect state values from ViewModel
     val totalCalories by sharedViewModel.totalCalories.collectAsState()
@@ -344,7 +346,7 @@ fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
     ) {
         // Background Image
         Image(
-            painter = painterResource(id = R.drawable.add_alcohol_bg), // Ensure correct file name
+            painter = painterResource(id = R.drawable.add_alcohol_bg),
             contentDescription = "Add Alcohol Background",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
@@ -354,7 +356,7 @@ fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.3f)) // Optional dark overlay for better contrast
+                .background(Color.Black.copy(alpha = 0.3f))
                 .padding(16.dp),
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
@@ -379,7 +381,7 @@ fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
             LazyColumn {
                 items(searchResults) { alcohol ->
                     Button(
-                        onClick = { sharedViewModel.addAlcohol(alcohol) }, // ✅ Add drink when clicked
+                        onClick = { sharedViewModel.addAlcohol(alcohol) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("${alcohol.drinkName} (${alcohol.brandName})")
@@ -396,9 +398,30 @@ fun AddAlcoholScreen(sharedViewModel: AlcoholViewModel) {
             Text(text = "Fats: $totalFat g", color = Color.White)
             Text(text = "Proteins: $totalProtein g", color = Color.White)
             Text(text = "Alcohol Units: $totalAlcoholUnits", color = Color.White)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ⚠️ Display Warnings Section
+            if (warnings.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFFFEB3B).copy(alpha = 0.85f))  // Light yellow background for warnings
+                        .padding(8.dp)
+                ) {
+                    warnings.forEach { warning ->
+                        Text(
+                            text = warning,
+                            color = Color.Black,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
         }
     }
 }
+
 
 
 // 🔹 List Screen
