@@ -1,6 +1,5 @@
 package com.example.alcoholmonitor
 
-import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -46,8 +45,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
@@ -55,11 +52,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.alcoholmonitor.presentation.screens.AccountScreen
+import com.example.alcoholmonitor.presentation.screens.SignInScreen
 import com.example.alcoholmonitor.ui.theme.AlcoholMonitorTheme
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+
 
 private lateinit var auth: FirebaseAuth
 
@@ -129,192 +129,33 @@ fun searchAlcoholBrands(query: String, onResult: (List<AlcoholItem>) -> Unit) {
 }
 // 🔹 Main Navigation
 @Composable
-fun NavigationHost(navController: NavHostController, sharedViewModel: AlcoholViewModel, modifier: Modifier = Modifier) {
-    val context = LocalContext.current // ✅ Get the current context
+fun NavigationHost(
+    navController: NavHostController,
+    sharedViewModel: AlcoholViewModel,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
 
     NavHost(
         navController = navController,
         startDestination = Screen.SignIn.route,
         modifier = modifier
     ) {
-        composable(Screen.SignIn.route) { SignInScreen(navController = navController, auth = FirebaseAuth.getInstance()) }
-        composable(Screen.Account.route) { AccountScreen(navController = navController, auth = FirebaseAuth.getInstance(), sharedViewModel = sharedViewModel, context = context) }
-        composable(Screen.AddAlcohol.route) { AddAlcoholScreen(sharedViewModel) }
-        composable(Screen.List.route) { ListScreen(sharedViewModel) }
-    }
-}
-
-
-// 🔹 Sign-In Screen
-@Composable
-fun SignInScreen(navController: NavController, auth: FirebaseAuth) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Welcome Back!",
-            style = MaterialTheme.typography.headlineMedium
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Email Input
-        TextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
-
-        // Password Input
-        TextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            singleLine = true,
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Log In Button
-        Button(
-            onClick = {
-                if (email.isNotEmpty() && password.isNotEmpty()) {
-                    auth.signInWithEmailAndPassword(email, password)
-                        .addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                Log.d("Auth", "Login successful!")
-                                navController.navigate(Screen.AddAlcohol.route)
-                            } else {
-                                Log.w("Auth", "Login failed", task.exception)
-                            }
-                        }
-                } else {
-                    Log.w("Auth", "Email or password cannot be empty")
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text("Log In", style = MaterialTheme.typography.labelLarge)
+        composable(Screen.SignIn.route) {
+            SignInScreen(navController = navController, auth = auth, sharedViewModel = sharedViewModel)
         }
-
-        // Sign Up Button
-        Button(
-            onClick = {
-                if (email.isNotEmpty() && password.isNotEmpty()) {
-                    auth.createUserWithEmailAndPassword(email, password)
-                        .addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                Log.d("Auth", "Signup successful!")
-                                navController.navigate(Screen.AddAlcohol.route)
-                            } else {
-                                Log.w("Auth", "Signup failed", task.exception)
-                            }
-                        }
-                } else {
-                    Log.w("Auth", "Email or password cannot be empty")
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text("Sign Up", style = MaterialTheme.typography.labelLarge)
+        composable(Screen.Account.route) {
+            AccountScreen(navController = navController, auth = auth, sharedViewModel = sharedViewModel, context = context)
+        }
+        composable(Screen.AddAlcohol.route) {
+            AddAlcoholScreen(sharedViewModel = sharedViewModel)
+        }
+        composable(Screen.List.route) {
+            ListScreen(sharedViewModel = sharedViewModel)
         }
     }
 }
-
-// 🔹 Account Screen
-@Composable
-fun AccountScreen(navController: NavController, auth: FirebaseAuth, sharedViewModel: AlcoholViewModel, context: Context) {
-    val user = auth.currentUser
-
-    // 🔹 Observe the alcohol list from ViewModel
-    val alcoholList by sharedViewModel.alcoholList.collectAsState()
-
-    // 🔹 Fetch weekly intake when the screen loads
-    LaunchedEffect(user) {
-        user?.uid?.let { userId ->
-            sharedViewModel.fetchAlcoholIntake(userId) // ✅ Fetch weekly data on screen load
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = "Account Details", style = MaterialTheme.typography.headlineMedium)
-
-        user?.email?.let {
-            Text(text = "Email: $it", style = MaterialTheme.typography.bodyLarge)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(text = "Weekly Alcohol Intake", style = MaterialTheme.typography.titleMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (alcoholList.isEmpty()) {
-            Text(text = "No alcohol logged this week", style = MaterialTheme.typography.bodyLarge)
-        } else {
-            alcoholList.forEach { (drink, count) ->
-                val totalUnits = drink.alcoholUnits * count  // ✅ Correct calculation using per-drink units
-                Text(
-                    text = "${drink.drinkName}: $count drinks ($totalUnits units)",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 🔹 Upload Weekly Data to Kaggle Button
-        Button(
-            onClick = {
-                user?.uid?.let { userId ->
-                    sharedViewModel.sendCsvToFlaskServer(context, userId)
-                }
-            }
-        ) {
-            Text("Upload Weekly Data to Kaggle")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 🔹 Logout Button
-        Button(
-            onClick = {
-                auth.signOut()
-                navController.navigate(Screen.SignIn.route)
-            }
-        ) {
-            Text("Log Out")
-        }
-    }
-}
-
-
 
 
 
