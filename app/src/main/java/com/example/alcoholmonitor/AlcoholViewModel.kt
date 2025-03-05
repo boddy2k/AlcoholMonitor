@@ -430,5 +430,41 @@ class AlcoholViewModel : ViewModel() {
         return warnings
     }
 
+    fun searchAlcoholBrands(query: String, onResult: (List<AlcoholItem>) -> Unit) {
+        if (query.isEmpty()) {
+            onResult(emptyList())
+            return
+        }
+
+        val db = Firebase.firestore
+        db.collection("alcohol_data")
+            .get()
+            .addOnSuccessListener { documents ->
+                val filteredResults = documents.mapNotNull { doc ->
+                    val name = doc.getString("Drink Name") ?: ""
+                    if (name.startsWith(query, ignoreCase = true)) {
+                        AlcoholItem(
+                            drinkName = name,
+                            brandName = doc.getString("Brand Name") ?: "",
+                            type = doc.getString("Type") ?: "",
+                            abv = doc.getDouble("ABV") ?: 0.0,
+                            calories = doc.getDouble("Calories") ?: 0.0,
+                            carbohydrates = doc.getString("Carbohydrates") ?: "0g",
+                            sugars = doc.getString("Sugars") ?: "0g",
+                            proteins = doc.getString("Proteins") ?: "0g",
+                            fats = doc.getString("Fats") ?: "0g",
+                            servingSize = doc.getString("Serving Size") ?: "Unknown",
+                            alcoholUnits = doc.getDouble("UK Alcohol Units") ?: 0.0
+                        )
+                    } else null
+                }
+                onResult(filteredResults)
+            }
+            .addOnFailureListener {
+                Log.e("Firestore", "Error fetching data", it)
+                onResult(emptyList())
+            }
+    }
+
 
 }
