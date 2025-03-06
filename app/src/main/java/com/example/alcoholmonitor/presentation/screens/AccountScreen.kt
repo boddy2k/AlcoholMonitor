@@ -41,7 +41,7 @@ fun AccountScreen(
         }
     }
 
-    val repository = remember { AlcoholRepository() }  // Direct repository access here
+    val repository = remember { AlcoholRepository() }  // Direct repository access for the upload
     val coroutineScope = rememberCoroutineScope()
 
     Column(
@@ -65,7 +65,8 @@ fun AccountScreen(
             Text("No alcohol logged this week")
         } else {
             alcoholList.forEach { (drink, count) ->
-                Text("${drink.drinkName}: $count drinks (${drink.alcoholUnits} units)")
+                val totalUnits = count * drink.alcoholUnits
+                Text("${drink.drinkName}: $count drinks (${totalUnits} units)")
             }
         }
 

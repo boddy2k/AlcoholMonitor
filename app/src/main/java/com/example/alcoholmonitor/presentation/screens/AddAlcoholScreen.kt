@@ -33,8 +33,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.alcoholmonitor.AlcoholItem
 import com.example.alcoholmonitor.R
+import com.example.alcoholmonitor.data.AlcoholItem
 import com.example.alcoholmonitor.data.AlcoholRepository
 import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 

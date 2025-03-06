@@ -2,7 +2,7 @@ package com.example.alcoholmonitor.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.alcoholmonitor.AlcoholItem
+import com.example.alcoholmonitor.data.AlcoholItem
 import com.example.alcoholmonitor.data.AlcoholRepository
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow

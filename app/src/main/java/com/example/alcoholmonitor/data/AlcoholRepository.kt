@@ -3,7 +3,6 @@ package com.example.alcoholmonitor.data
 import android.content.Context
 import android.os.Environment
 import android.util.Log
-import com.example.alcoholmonitor.AlcoholItem
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
@@ -28,37 +27,51 @@ class AlcoholRepository {
 
     suspend fun fetchAlcoholIntake(userId: String): Map<AlcoholItem, Int> {
         val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(Calendar.getInstance().time)
-        val docRef = db.collection("users").document(userId)
+        val intakeRef = db.collection("users").document(userId)
             .collection("alcohol_intake").document(weekId)
 
-        return try {
-            val document = docRef.get().await()
-            if (document.exists()) {
-                document.data?.mapNotNull { (drinkName, drinkData) ->
-                    val dataMap = drinkData as? Map<String, Any> ?: return@mapNotNull null
-                    val count = (dataMap["count"] as? Long)?.toInt() ?: 0
-                    val alcoholItem = AlcoholItem(
-                        drinkName = drinkName,
-                        brandName = "Unknown",
-                        type = "Unknown",
-                        abv = 0.0,
-                        calories = 0.0,
-                        carbohydrates = "0g",
-                        sugars = "0g",
-                        proteins = "0g",
-                        fats = "0g",
-                        servingSize = "N/A",
-                        alcoholUnits = (dataMap["unitsPerDrink"] as? Double) ?: 0.0
-                    )
-                    alcoholItem to count
-                }?.toMap() ?: emptyMap()
-            } else {
-                emptyMap()
-            }
-        } catch (e: Exception) {
-            Log.e("Firestore", "❌ Error fetching weekly alcohol intake", e)
-            emptyMap()
+        val intakeData = intakeRef.get().await().data ?: return emptyMap()
+
+        val fullAlcoholList = mutableMapOf<AlcoholItem, Int>()
+
+        for ((drinkName, drinkData) in intakeData) {
+            val drinkMap = drinkData as? Map<*, *> ?: continue
+            val count = (drinkMap["count"] as? Long)?.toInt() ?: continue
+            val unitsPerDrink = (drinkMap["unitsPerDrink"] as? Double) ?: continue
+
+            // 🔥 Fetch full AlcoholItem from alcohol_data collection
+            val alcoholItem = fetchFullAlcoholItem(drinkName) ?: continue
+
+            // 🔗 Ensure units match what was recorded (in case alcohol_data was updated)
+            val completeItem = alcoholItem.copy(alcoholUnits = unitsPerDrink)
+
+            fullAlcoholList[completeItem] = count
         }
+
+        return fullAlcoholList
+    }
+
+    private suspend fun fetchFullAlcoholItem(drinkName: String): AlcoholItem? {
+        val result = db.collection("alcohol_data")
+            .whereEqualTo("Drink Name", drinkName)
+            .get()
+            .await()
+
+        val doc = result.documents.firstOrNull() ?: return null
+
+        return AlcoholItem(
+            drinkName = doc.getString("Drink Name") ?: "Unknown",
+            brandName = doc.getString("Brand Name") ?: "Unknown",
+            type = doc.getString("Type") ?: "Unknown",
+            abv = doc.getDouble("ABV") ?: 0.0,
+            calories = doc.getDouble("Calories") ?: 0.0,
+            carbohydrates = doc.getString("Carbohydrates") ?: "0g",
+            sugars = doc.getString("Sugars") ?: "0g",
+            proteins = doc.getString("Proteins") ?: "0g",
+            fats = doc.getString("Fats") ?: "0g",
+            servingSize = doc.getString("Serving Size") ?: "Unknown",
+            alcoholUnits = doc.getDouble("UK Alcohol Units") ?: 0.0
+        )
     }
 
     suspend fun logAlcoholIntake(userId: String, alcohol: AlcoholItem, count: Int) {
