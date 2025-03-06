@@ -34,9 +34,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.alcoholmonitor.AlcoholItem
-import com.example.alcoholmonitor.AlcoholViewModel
 import com.example.alcoholmonitor.R
-import com.example.alcoholmonitor.presentation.navigation.Screen
+import com.example.alcoholmonitor.data.AlcoholRepository
+import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 
 @Composable
 fun AddAlcoholScreen(
@@ -53,8 +53,10 @@ fun AddAlcoholScreen(
     val totalFat by sharedViewModel.totalFat.collectAsState()
     val totalProtein by sharedViewModel.totalProtein.collectAsState()
 
+    val repository = remember { AlcoholRepository() }
+
     LaunchedEffect(searchText) {
-        sharedViewModel.searchAlcoholBrands(searchText) { results ->
+        repository.searchAlcoholBrands(searchText) { results ->
             searchResults = results
         }
     }

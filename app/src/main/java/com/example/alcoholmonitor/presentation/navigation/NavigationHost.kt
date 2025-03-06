@@ -6,7 +6,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.alcoholmonitor.AlcoholViewModel
+import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 import com.example.alcoholmonitor.presentation.screens.AccountScreen
 import com.example.alcoholmonitor.presentation.screens.AddAlcoholScreen
 import com.example.alcoholmonitor.presentation.screens.ListScreen

@@ -21,7 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.alcoholmonitor.AlcoholViewModel
+import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 import com.example.alcoholmonitor.presentation.navigation.Screen
 import com.google.firebase.auth.FirebaseAuth
 

@@ -14,12 +14,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.alcoholmonitor.AlcoholViewModel
+import com.example.alcoholmonitor.data.AlcoholRepository
 import com.example.alcoholmonitor.presentation.navigation.Screen
+import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 
 @Composable
 fun AccountScreen(
@@ -36,6 +40,9 @@ fun AccountScreen(
             sharedViewModel.fetchAlcoholIntake(userId)
         }
     }
+
+    val repository = remember { AlcoholRepository() }  // Direct repository access here
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -66,7 +73,9 @@ fun AccountScreen(
 
         Button(onClick = {
             user?.uid?.let { userId ->
-                sharedViewModel.sendCsvToFlaskServer(context, userId)
+                coroutineScope.launch {
+                    repository.sendCsvToFlaskServer(context, userId)
+                }
             }
         }) {
             Text("Upload Weekly Data to Kaggle")
