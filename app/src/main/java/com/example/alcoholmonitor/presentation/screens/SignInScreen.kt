@@ -1,7 +1,10 @@
 package com.example.alcoholmonitor.presentation.screens
 
 import android.util.Log
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,10 +22,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
+import com.example.alcoholmonitor.R
 import com.example.alcoholmonitor.presentation.navigation.Screen
+import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
@@ -34,49 +41,74 @@ fun SignInScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
-        Text("Welcome Back!", style = MaterialTheme.typography.headlineMedium)
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        TextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth()
+        // Background Image
+        Image(
+            painter = painterResource(id = R.drawable.sign_in2), // Use your image here
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        TextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            modifier = Modifier.fillMaxWidth()
+        // Overlay for better text visibility
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.4f)) // Optional overlay
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(onClick = {
-            auth.signInWithEmailAndPassword(email, password)
-                .addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        Log.d("Auth", "Login successful!")
-                        navController.navigate(Screen.AddAlcohol.route) // This must work!
-                    } else {
-                        Log.w("Auth", "Login failed", task.exception)
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
+        // Content Column
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+                .align(Alignment.Center), // Center content vertically and horizontally
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Login")
+            Text("Welcome Back!", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Email TextField
+            TextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Password TextField
+            TextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    auth.signInWithEmailAndPassword(email, password)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Log.d("Auth", "Login successful!")
+                                navController.navigate(Screen.AddAlcohol.route) // Navigate to Add Alcohol screen
+                            } else {
+                                Log.w("Auth", "Login failed", task.exception)
+                            }
+                        }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Login", color = Color.White)
+            }
         }
     }
 }
+

@@ -23,8 +23,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 import com.example.alcoholmonitor.R
+import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 
 @Composable
 fun ListScreen(sharedViewModel: AlcoholViewModel) {
@@ -34,7 +34,7 @@ fun ListScreen(sharedViewModel: AlcoholViewModel) {
         modifier = Modifier.fillMaxSize()
     ) {
         Image(
-            painter = painterResource(id = R.drawable.list_screen_bg1),
+            painter = painterResource(id = R.drawable.list_screen2),
             contentDescription = "Background Image",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()

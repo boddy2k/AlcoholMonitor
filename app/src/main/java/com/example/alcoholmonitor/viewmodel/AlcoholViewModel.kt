@@ -46,6 +46,7 @@ class AlcoholViewModel(
             }
 
             updateTotals()
+            updateWarnings()
 
             viewModelScope.launch {
                 repository.logAlcoholIntake(currentUser.uid, alcohol, 1)
@@ -66,6 +67,7 @@ class AlcoholViewModel(
             }
 
             updateTotals()
+            updateWarnings()
 
             viewModelScope.launch {
                 repository.logAlcoholIntake(currentUser.uid, alcohol, -1)
@@ -103,19 +105,22 @@ class AlcoholViewModel(
         _totalAlcohol.value = alcoholUnits
     }
 
-    fun calculateWarnings(): List<String> {
-        val warnings = mutableListOf<String>()
+    private val _warnings = MutableStateFlow<List<String>>(emptyList())
+    val warnings: StateFlow<List<String>> = _warnings
+
+    private fun updateWarnings() {
+        val newWarnings = mutableListOf<String>()
+
+        if (_totalAlcohol.value >= 14) {
+            newWarnings.add("🚨 NHS recommends no more than 14 units per week. You've reached this limit.")
+        } else if (_totalAlcohol.value >= 7) {
+            newWarnings.add("⚠️ You're passed halfway to the NHS recommended weekly alcohol limit (7 units).")
+        }
 
         if (_totalAlcohol.value >= 2.5) {
-            warnings.add("🚗 UK motor regulation prohibits you from driving a vehicle once you have consumed 2.5 units of alcohol.")
-        }
-        if (_totalAlcohol.value >= 7) {
-            warnings.add("⚠️ You are halfway to the weekly recommended limit of alcohol consumption. Consider slowing down.")
-        }
-        if (_totalAlcohol.value >= 14) {
-            warnings.add("🚨 NHS guidelines recommend no more than 14 units of alcohol per week. You have reached this limit.")
+            newWarnings.add("🚗 UK motor regulation prohibits you from driving after 2.5 units.")
         }
 
-        return warnings
+        _warnings.value = newWarnings
     }
 }

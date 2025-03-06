@@ -20,6 +20,7 @@ import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import java.util.UUID
 
 class AlcoholRepository {
 
@@ -137,18 +138,26 @@ class AlcoholRepository {
     }
 
 
-    fun exportWeeklyDataToCSV(context: Context, dataList: Map<AlcoholItem, Int>): File? {
+    fun exportWeeklyDataToCSV(context: Context, dataList: Map<AlcoholItem, Int>, userId: String): File? {
         val weekId = SimpleDateFormat("yyyy-'W'ww", Locale.getDefault()).format(Calendar.getInstance().time)
         val fileName = "alcohol_weekly_${weekId}.csv"
         val directory = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: return null
         val file = File(directory, fileName)
 
+        // Get or create the anonymous ID
+        val anonId = getOrCreateAnonId(context)
+
         return try {
             FileWriter(file).use { writer ->
-                writer.append("Drink Name,Total Count,Alcohol Units,Week ID\n")
+                // Write CSV headers
+                writer.append("Anon ID,Drink Name,Total Count,Alcohol Units,Week ID\n")
+
+                // Write each AlcoholItem as a row in the CSV
                 dataList.forEach { (alcoholItem, count) ->
-                    writer.append("${alcoholItem.drinkName},$count,${alcoholItem.alcoholUnits * count},$weekId\n")
+                    writer.append("$anonId,${alcoholItem.drinkName},$count,${alcoholItem.alcoholUnits * count},$weekId\n")
                 }
+
+                Log.d("Kaggle", "✅ Weekly CSV file successfully created at: ${file.absolutePath}")
             }
             file
         } catch (e: IOException) {
@@ -206,7 +215,7 @@ class AlcoholRepository {
     fun sendCsvToFlaskServer(context: Context, userId: String) {
         fetchWeeklyAlcoholData(userId) { weeklyData ->
             if (weeklyData.isNotEmpty()) {
-                val csvFile = exportWeeklyDataToCSV(context, weeklyData)
+                val csvFile = exportWeeklyDataToCSV(context, weeklyData, userId)  // Pass userId
                 if (csvFile != null) {
                     val flaskUrl = "http://10.0.2.2:5000/upload"
 
@@ -242,6 +251,21 @@ class AlcoholRepository {
                 Log.d("FlaskUpload", "⚠ No weekly data available to upload.")
             }
         }
+    }
+
+    fun getOrCreateAnonId(context: Context): String {
+        val sharedPreferences = context.getSharedPreferences("KagglePrefs", Context.MODE_PRIVATE)
+        var anonId = sharedPreferences.getString("anon_user_id", null)
+
+        if (anonId == null) {
+            // Generate a new random anonymous ID
+            anonId = UUID.randomUUID().toString().take(8)  // Shorten the ID for readability
+            sharedPreferences.edit().putString("anon_user_id", anonId).apply()
+            Log.d("Kaggle", "Generated new anonymous ID: $anonId")
+        } else {
+            Log.d("Kaggle", "Using existing anonymous ID: $anonId")
+        }
+        return anonId
     }
 
 }

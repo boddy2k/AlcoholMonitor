@@ -20,7 +20,6 @@ import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,7 +44,7 @@ fun AddAlcoholScreen(
 ) {
     var searchText by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf(listOf<AlcoholItem>()) }
-    val warnings by remember { derivedStateOf { sharedViewModel.calculateWarnings() } }
+    val warnings by sharedViewModel.warnings.collectAsState()
 
     val totalCalories by sharedViewModel.totalCalories.collectAsState()
     val totalCarbs by sharedViewModel.totalCarbs.collectAsState()
@@ -70,7 +69,7 @@ fun AddAlcoholScreen(
         modifier = Modifier.fillMaxSize()
     ) {
         Image(
-            painter = painterResource(id = R.drawable.add_alcohol_bg),
+            painter = painterResource(id = R.drawable.add_alcohol2),
             contentDescription = "Add Alcohol Background",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()

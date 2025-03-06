@@ -1,7 +1,10 @@
 package com.example.alcoholmonitor.presentation.screens
 
 import android.content.Context
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,14 +18,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.alcoholmonitor.R
 import com.example.alcoholmonitor.data.AlcoholRepository
 import com.example.alcoholmonitor.presentation.navigation.Screen
 import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
@@ -34,63 +42,72 @@ fun AccountScreen(
 ) {
     val user = auth.currentUser
     val alcoholList by sharedViewModel.alcoholList.collectAsState()
+    val repository = remember { AlcoholRepository() }
 
     LaunchedEffect(user) {
-        user?.uid?.let { userId ->
-            sharedViewModel.fetchAlcoholIntake(userId)
-        }
+        user?.reload()
     }
 
-    val repository = remember { AlcoholRepository() }  // Direct repository access for the upload
-    val coroutineScope = rememberCoroutineScope()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Top
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
-        Text("Account Details", style = MaterialTheme.typography.headlineMedium)
+        Image(
+            painter = painterResource(id = R.drawable.account_screen2),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
 
-        user?.email?.let {
-            Text("Email: $it")
-        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Top
+        ) {
+            Text("Account Details", style = MaterialTheme.typography.headlineMedium, color = Color.White)
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text("Weekly Alcohol Intake", style = MaterialTheme.typography.titleMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (alcoholList.isEmpty()) {
-            Text("No alcohol logged this week")
-        } else {
-            alcoholList.forEach { (drink, count) ->
-                val totalUnits = count * drink.alcoholUnits
-                Text("${drink.drinkName}: $count drinks (${totalUnits} units)")
+            user?.email?.let {
+                Text("Email: $it", color = Color.White)
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = {
-            user?.uid?.let { userId ->
-                coroutineScope.launch {
-                    repository.sendCsvToFlaskServer(context, userId)
+            if (alcoholList.isEmpty()) {
+                Text("No alcohol logged this week", color = Color.White)
+            } else {
+                alcoholList.forEach { (drink, count) ->
+                    val totalUnits = count * drink.alcoholUnits
+                    Text("${drink.drinkName}: $count drinks (${totalUnits} units)", color = Color.White)
                 }
             }
-        }) {
-            Text("Upload Weekly Data to Kaggle")
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = {
-            auth.signOut()
-            navController.navigate(Screen.SignIn.route) {
-                popUpTo(Screen.SignIn.route) { inclusive = true }
+            Button(onClick = {
+                user?.uid?.let { userId ->
+                    CoroutineScope(Dispatchers.IO).launch {
+                        repository.sendCsvToFlaskServer(context, userId)
+                    }
+                }
+            }) {
+                Text("Upload Weekly Data to Kaggle")
             }
-        }) {
-            Text("Log Out")
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(onClick = {
+                auth.signOut()
+
+                // Clear the navigation stack and navigate to SignIn screen
+                navController.navigate(Screen.SignIn.route) {
+                    // This ensures that pressing back won't take you back to Account screen
+                    popUpTo(Screen.SignIn.route) { inclusive = true }
+                }
+            }) {
+                Text("Log Out")
+            }
         }
     }
 }
+
