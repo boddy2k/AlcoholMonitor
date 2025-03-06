@@ -36,6 +36,7 @@ import androidx.navigation.NavController
 import com.example.alcoholmonitor.AlcoholItem
 import com.example.alcoholmonitor.AlcoholViewModel
 import com.example.alcoholmonitor.R
+import com.example.alcoholmonitor.presentation.navigation.Screen
 
 @Composable
 fun AddAlcoholScreen(

@@ -1,4 +1,4 @@
-package com.example.alcoholmonitor
+package com.example.alcoholmonitor.presentation.navigation
 
 sealed class Screen(val route: String) {
     object SignIn : Screen("sign_in")

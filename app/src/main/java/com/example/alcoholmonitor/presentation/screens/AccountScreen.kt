@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.alcoholmonitor.AlcoholViewModel
-import com.example.alcoholmonitor.Screen
+import com.example.alcoholmonitor.presentation.navigation.Screen
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
