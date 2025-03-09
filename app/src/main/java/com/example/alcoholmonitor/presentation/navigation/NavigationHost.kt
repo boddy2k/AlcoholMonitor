@@ -6,11 +6,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 import com.example.alcoholmonitor.presentation.screens.AccountScreen
 import com.example.alcoholmonitor.presentation.screens.AddAlcoholScreen
 import com.example.alcoholmonitor.presentation.screens.ListScreen
 import com.example.alcoholmonitor.presentation.screens.SignInScreen
+import com.example.alcoholmonitor.viewmodel.AlcoholViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
@@ -42,3 +42,6 @@ fun NavigationHost(
         }
     }
 }
+
+
+

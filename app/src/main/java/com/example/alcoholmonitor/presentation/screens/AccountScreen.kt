@@ -96,17 +96,19 @@ fun AccountScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(onClick = {
-                auth.signOut()
+            Button(
+                onClick = {
+                    FirebaseAuth.getInstance().signOut()
 
-                // Clear the navigation stack and navigate to SignIn screen
-                navController.navigate(Screen.SignIn.route) {
-                    // This ensures that pressing back won't take you back to Account screen
-                    popUpTo(Screen.SignIn.route) { inclusive = true }
+                    // 🔥 Ensure BottomNav disappears immediately
+                    navController.navigate(Screen.SignIn.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
-            }) {
+            ) {
                 Text("Log Out")
             }
+
         }
     }
 }

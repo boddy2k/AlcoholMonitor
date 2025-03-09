@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +41,7 @@ fun SignInScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var isCreatingAccount by remember { mutableStateOf(false) } // Track sign-up vs login mode
 
     Box(
         modifier = Modifier.fillMaxSize()
@@ -68,7 +70,11 @@ fun SignInScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Welcome Back!", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+            Text(
+                if (isCreatingAccount) "Create an Account" else "Welcome Back!",
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.White
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -94,21 +100,56 @@ fun SignInScreen(
 
             Button(
                 onClick = {
-                    auth.signInWithEmailAndPassword(email, password)
-                        .addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                Log.d("Auth", "Login successful!")
-                                navController.navigate(Screen.AddAlcohol.route) // Navigate to Add Alcohol screen
-                            } else {
-                                Log.w("Auth", "Login failed", task.exception)
+                    if (isCreatingAccount) {
+                        auth.createUserWithEmailAndPassword(email, password)
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    Log.d("Auth", "Account created successfully!")
+
+                                    // 🔥 Clear the navigation back stack and ensure BottomNav appears
+                                    navController.navigate(Screen.AddAlcohol.route) {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                } else {
+                                    Log.w("Auth", "Account creation failed", task.exception)
+                                }
                             }
-                        }
+                    } else {
+                        auth.signInWithEmailAndPassword(email, password)
+                            .addOnCompleteListener { task ->
+                                if (task.isSuccessful) {
+                                    Log.d("Auth", "Login successful!")
+
+                                    // 🔥 Clear the navigation back stack and ensure BottomNav appears
+                                    navController.navigate(Screen.AddAlcohol.route) {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                } else {
+                                    Log.w("Auth", "Login failed", task.exception)
+                                }
+                            }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Login", color = Color.White)
+                Text(if (isCreatingAccount) "Sign Up" else "Login", color = Color.White)
+            }
+
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Toggle between Sign In and Sign Up
+            TextButton(
+                onClick = { isCreatingAccount = !isCreatingAccount } // Toggle mode
+            ) {
+                Text(
+                    if (isCreatingAccount) "Already have an account? Log in"
+                    else "Don't have an account? Create one",
+                    color = Color.White
+                )
             }
         }
     }
 }
+
 
